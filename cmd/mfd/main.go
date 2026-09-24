@@ -9,9 +9,11 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/Nielk74/mfd/internal/etoro"
 	"github.com/Nielk74/mfd/internal/httpapi"
 	"github.com/Nielk74/mfd/internal/platform"
 )
@@ -58,13 +60,29 @@ func run() error {
 		return err
 	}
 	defer p.Close()
+	apiKey, userKey := os.Getenv("ETORO_API_KEY"), os.Getenv("ETORO_DEMO_USER_KEY")
+	if apiKey != "" || userKey != "" {
+		if apiKey == "" || userKey == "" {
+			return fmt.Errorf("both eToro demo keys are required")
+		}
+		p.Broker, err = platform.NewBrokerService(p.DB, &etoro.Client{APIKey: apiKey, UserKey: userKey}, os.Getenv("MFD_ACCOUNT_ENCRYPTION_KEY"), os.Getenv("MFD_OPERATOR_TOKEN"))
+		if err != nil {
+			return err
+		}
+	}
 	wait, err := p.Start(ctx, workers)
 	if err != nil {
 		return err
 	}
 	defer wait()
 	defer stop()
-	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
+	var brokerWorkers sync.WaitGroup
+	if p.Broker != nil {
+		brokerWorkers.Add(1)
+		go func() { defer brokerWorkers.Done(); p.Broker.Run(ctx) }()
+	}
+	defer func() { stop(); brokerWorkers.Wait() }()
+	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 40 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)
 	go func() {
 		slog.Info("lab ready", "address", server.Addr, "mode", "fixture", "workers", workers)

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/Nielk74/mfd/internal/lab"
 	"github.com/Nielk74/mfd/internal/platform"
 	"github.com/jackc/pgx/v5"
 )
@@ -26,9 +28,14 @@ var keyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{8,100}$`)
 var idPattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 
 type Store interface {
-	Enqueue(context.Context, string) (string, error)
+	Enqueue(context.Context, string, lab.Experiment) (string, error)
 	Runs(context.Context) ([]platform.Run, error)
 	Run(context.Context, string) (platform.Run, error)
+	Operations(context.Context) (platform.Operations, error)
+	BrokerStatus(context.Context) (platform.BrokerStatus, error)
+	BrokerAuthorized(string) bool
+	BrokerHistory(context.Context) ([]platform.BrokerSnapshot, error)
+	BrokerSync(context.Context) (platform.BrokerStatus, error)
 	Ready(context.Context) map[string]bool
 	Metrics(context.Context) (string, error)
 }
@@ -69,6 +76,51 @@ func New(p Store) http.Handler {
 		}
 		write(w, 200, map[string]any{"runs": runs, "limit": 50})
 	})
+	mux.HandleFunc("GET /api/v1/operations", func(w http.ResponseWriter, r *http.Request) {
+		ops, err := p.Operations(r.Context())
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, ops)
+	})
+	mux.HandleFunc("GET /api/v1/etoro/status", func(w http.ResponseWriter, r *http.Request) {
+		status, err := p.BrokerStatus(r.Context())
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, status)
+	})
+	operator := func(w http.ResponseWriter, r *http.Request) bool {
+		if !p.BrokerAuthorized(r.Header.Get("X-MFD-Operator-Token")) {
+			write(w, 401, map[string]string{"error": "operator_token_required"})
+			return false
+		}
+		return true
+	}
+	mux.HandleFunc("GET /api/v1/etoro/snapshots", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		items, err := p.BrokerHistory(r.Context())
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, map[string]any{"snapshots": items, "limit": 30})
+	})
+	mux.HandleFunc("POST /api/v1/etoro/sync", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		status, err := p.BrokerSync(r.Context())
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, status)
+	})
 	mux.HandleFunc("GET /api/v1/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if !idPattern.MatchString(id) {
@@ -97,10 +149,10 @@ func New(p Store) http.Handler {
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 1024)
-		var payload map[string]json.RawMessage
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&payload); err != nil || payload == nil || len(payload) != 0 {
-			write(w, 400, map[string]string{"error": "expected_empty_object"})
+		var raw json.RawMessage
+		if err := decoder.Decode(&raw); err != nil || len(raw) == 0 || raw[0] != '{' {
+			write(w, 400, map[string]string{"error": "invalid_experiment", "detail": "Use name, final_shock_bps and review_threshold_bps only."})
 			return
 		}
 		var extra any
@@ -108,7 +160,22 @@ func New(p Store) http.Handler {
 			write(w, 400, map[string]string{"error": "expected_one_object"})
 			return
 		}
-		id, err := p.Enqueue(r.Context(), key)
+		var payload lab.Experiment
+		strict := json.NewDecoder(bytes.NewReader(raw))
+		strict.DisallowUnknownFields()
+		if err := strict.Decode(&payload); err != nil {
+			write(w, 400, map[string]string{"error": "invalid_experiment", "detail": "Use name, final_shock_bps and review_threshold_bps only."})
+			return
+		}
+		if _, err := lab.NormalizeExperiment(payload); err != nil {
+			write(w, 400, map[string]string{"error": "invalid_experiment", "detail": err.Error()})
+			return
+		}
+		id, err := p.Enqueue(r.Context(), key, payload)
+		if errors.Is(err, platform.ErrIdempotencyConflict) {
+			write(w, 409, map[string]string{"error": "idempotency_key_reused", "detail": "Use a new key for a different experiment."})
+			return
+		}
 		if err != nil {
 			failure(w, err)
 			return
@@ -125,7 +192,11 @@ func New(p Store) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
 		w.Header().Set("Cache-Control", "no-store")
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		timeout := 10 * time.Second
+		if r.URL.Path == "/api/v1/etoro/sync" {
+			timeout = 35 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		protected.ServeHTTP(w, r.WithContext(ctx))
 	})

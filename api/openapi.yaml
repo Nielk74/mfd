@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: mfd fixture lab
-  version: 0.1.0
-  description: Unauthenticated fixture foundation. Only fixture replays are implemented; no broker or model execution.
+  version: 0.2.0
+  description: Artificial experiment lab with a protected read-only eToro demo importer. Broker order and model execution are unavailable.
 servers:
   - url: https://mfd.aklein.fr
   - url: http://localhost:8088
@@ -10,7 +10,7 @@ paths:
   /api/v1/replays:
     post:
       operationId: createFixtureReplay
-      summary: Enqueue a durable fixture replay
+      summary: Enqueue a durable artificial experiment
       parameters:
         - name: Idempotency-Key
           in: header
@@ -23,8 +23,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: false
+              $ref: '#/components/schemas/Experiment'
       responses:
         '202':
           description: Queued or previously accepted under the same key. Follow status_url for the current state.
@@ -38,6 +37,7 @@ paths:
                   status_url: {type: string}
         '400': {description: Invalid key or request body}
         '403': {description: Browser cross-origin write rejected}
+        '409': {description: Idempotency key already belongs to a different experiment}
         '415': {description: Content-Type must be application/json}
         '503': {description: Storage unavailable; retry with the same key}
   /api/v1/runs:
@@ -76,6 +76,61 @@ paths:
         '400': {description: Malformed ID}
         '404': {description: Run not found}
         '503': {description: Storage unavailable}
+  /api/v1/operations:
+    get:
+      operationId: inspectOperations
+      summary: Read-only PostgreSQL and NATS queue view
+      responses:
+        '200':
+          description: Dependency, storage, queue and recent job status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Operations'}
+        '503': {description: PostgreSQL unavailable}
+  /api/v1/etoro/status:
+    get:
+      operationId: getEtoroDemoStatus
+      summary: Read-only connector status without account values
+      responses:
+        '200':
+          description: Latest demo read result and encrypted snapshot count
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BrokerStatus'}
+  /api/v1/etoro/snapshots:
+    get:
+      operationId: listEtoroDemoSnapshots
+      summary: Latest 30 decrypted demo portfolio summaries
+      security: [{operatorToken: []}]
+      responses:
+        '200':
+          description: Provider-reported demo values and instrument IDs, separate from artificial sleeves
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [snapshots, limit]
+                properties:
+                  limit: {type: integer, const: 30}
+                  snapshots:
+                    type: array
+                    items: {$ref: '#/components/schemas/BrokerSnapshot'}
+        '401': {description: Operator token required}
+        '503': {description: Encrypted data unavailable or invalid}
+  /api/v1/etoro/sync:
+    post:
+      operationId: syncEtoroDemo
+      summary: Request an official read-only demo portfolio import
+      description: At most one provider request every 30 seconds; a denied read records a status, not an account snapshot.
+      security: [{operatorToken: []}]
+      responses:
+        '200':
+          description: Connector status after attempting the read
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BrokerStatus'}
+        '401': {description: Operator token required}
+        '503': {description: Local storage unavailable}
   /healthz:
     get:
       operationId: liveness
@@ -94,7 +149,108 @@ paths:
         '200': {description: Prometheus text exposition}
         '503': {description: Database metrics unavailable}
 components:
+  securitySchemes:
+    operatorToken:
+      type: apiKey
+      in: header
+      name: X-MFD-Operator-Token
   schemas:
+    BrokerStatus:
+      type: object
+      required: [configured, provider, environment, last_attempt, last_result, http_status, last_success, snapshot_count, execution_enabled]
+      properties:
+        configured: {type: boolean}
+        provider: {type: string, const: etoro}
+        environment: {type: string, const: demo}
+        last_attempt: {type: [string, 'null'], format: date-time}
+        last_result: {type: string}
+        http_status: {type: integer}
+        last_success: {type: [string, 'null'], format: date-time}
+        snapshot_count: {type: integer}
+        execution_enabled: {type: boolean, const: false}
+    BrokerSnapshot:
+      type: object
+      required: [id, fetched_at, source_sha256, portfolio]
+      properties:
+        id: {type: string, format: uuid}
+        fetched_at: {type: string, format: date-time}
+        source_sha256: {type: string, description: Hash of the encrypted source payload}
+        portfolio:
+          type: object
+          required: [provider_at, currency, available_cash, total_value, current_pnl, instruments, mirror_count]
+          properties:
+            provider_at: {type: string, format: date-time}
+            currency: {type: string, const: USD}
+            available_cash: {$ref: '#/components/schemas/Decimal'}
+            total_value: {$ref: '#/components/schemas/Decimal'}
+            current_pnl: {$ref: '#/components/schemas/Decimal'}
+            mirror_count: {type: integer}
+            instruments:
+              type: array
+              items:
+                type: object
+                required: [instrument_id, asset_currency, net_units, exposure_usd, pnl_asset_currency, liquidation_usd, average_leverage]
+                properties:
+                  instrument_id: {type: integer}
+                  asset_currency: {type: string}
+                  net_units: {$ref: '#/components/schemas/Decimal'}
+                  exposure_usd: {$ref: '#/components/schemas/Decimal'}
+                  pnl_asset_currency: {$ref: '#/components/schemas/Decimal'}
+                  liquidation_usd: {$ref: '#/components/schemas/Decimal'}
+                  average_leverage: {$ref: '#/components/schemas/Decimal'}
+    Experiment:
+      type: object
+      additionalProperties: false
+      description: Artificial final quote shock; omitted values default to the baseline. No holdings or orders change.
+      properties:
+        name: {type: string, maxLength: 60, default: Baseline}
+        final_shock_bps:
+          type: object
+          additionalProperties: false
+          properties:
+            AAPL: {type: integer, minimum: -5000, maximum: 5000}
+            MSFT: {type: integer, minimum: -5000, maximum: 5000}
+        review_threshold_bps: {type: integer, minimum: 1, maximum: 5000, default: 100}
+    Operations:
+      type: object
+      required: [generated_at, dependencies, database, queue]
+      properties:
+        generated_at: {type: string, format: date-time}
+        dependencies:
+          type: object
+          properties:
+            postgres: {type: boolean}
+            nats: {type: boolean}
+            redis: {type: boolean}
+        database:
+          type: object
+          properties:
+            runs: {type: object, additionalProperties: {type: integer}}
+            storage_bytes: {type: integer}
+            outbox_pending: {type: integer}
+            recent_jobs:
+              type: array
+              items:
+                type: object
+                properties:
+                  run_id: {type: string, format: uuid}
+                  name: {type: string}
+                  status: {type: string}
+                  created_at: {type: string, format: date-time}
+                  published_at: {type: [string, 'null'], format: date-time}
+                  finished_at: {type: [string, 'null'], format: date-time}
+        queue:
+          type: object
+          properties:
+            connected: {type: boolean}
+            stream: {type: string}
+            messages: {type: integer}
+            bytes: {type: integer}
+            consumers: {type: integer}
+            pending: {type: integer}
+            ack_pending: {type: integer}
+            redelivered: {type: integer}
+            error: {type: string}
     Decimal:
       type: string
       pattern: '^-?[0-9]+(\.[0-9]+)?$'
@@ -145,13 +301,14 @@ components:
         snapshot_index: {type: integer, minimum: 0}
     Run:
       type: object
-      required: [id, status, mode, actor, dataset_hash, created_at, finished_at, result, error]
+      required: [id, status, mode, actor, dataset_hash, experiment, created_at, finished_at, result, error]
       properties:
         id: {type: string, format: uuid}
         status: {type: string, enum: [queued, completed, failed]}
         mode: {type: string, const: fixture}
         actor: {type: string, description: Local caller label; authenticated attribution is not implemented.}
         dataset_hash: {type: string}
+        experiment: {$ref: '#/components/schemas/Experiment'}
         created_at: {type: string, format: date-time}
         finished_at: {type: [string, 'null'], format: date-time}
         error: {type: [string, 'null']}
@@ -159,9 +316,10 @@ components:
           oneOf:
             - type: 'null'
             - type: object
-              required: [dataset_hash, valuation_version, snapshots, decisions]
+              required: [dataset_hash, valuation_version, experiment, snapshots, decisions]
               properties:
                 dataset_hash: {type: string}
                 valuation_version: {type: string}
+                experiment: {$ref: '#/components/schemas/Experiment'}
                 snapshots: {type: array, items: {$ref: '#/components/schemas/Snapshot'}}
                 decisions: {type: array, items: {$ref: '#/components/schemas/Decision'}}

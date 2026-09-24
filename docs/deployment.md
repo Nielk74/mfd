@@ -12,6 +12,8 @@ The complete stack runs under the Compose project `mfd`. All published ports bin
 | NATS clients | 4222 | TCP access through the host address |
 | NATS monitoring | 8222 | HTTP access through the host address |
 
+Grafana provisions [Portfolio & decisions](https://mfd-grafana.aklein.fr/d/mfd-lab) and [Queue & database operations](https://mfd-grafana.aklein.fr/d/mfd-operations). The lab also has a read-only **Queues & database** view for day-to-day inspection.
+
 Caddy terminates HTTPS and proxies the three web hostnames to the Mac's LAN address. Caddy configuration is managed separately from the application release. Its administrative credentials are never stored in this repository. Database and queue protocols are not HTTP virtual hosts.
 
 ## Automatic updates
@@ -41,6 +43,7 @@ The default state directory is `~/.local/share/mfd`, outside the working reposit
 
 - `config.json`: repository, branch, project and Docker context.
 - `settings.env`: network bindings, ports and worker count.
+- `settings.env` also holds the eToro demo keys, account encryption key and operator token when the connector is configured. It is private to this user (`0600`) under a `0700` directory; no secret is in Git. Changing this file makes the scheduled updater recreate and verify the current app release on its next check.
 - `status.json`: current/candidate SHA, CI link, last check, deployment time and error.
 - `deploy.log`: rotating update log; `build.log`: latest build output.
 - `releases/<sha>/`: immutable release checkout; the development checkout is untouched.
@@ -56,5 +59,7 @@ rm ~/.local/share/mfd/paused          # resume on the next minute
 Run the installed updater manually for an immediate check. The same lock protects manual and scheduled invocations. Reinstall after changing installer behavior; the updater script itself follows accepted deployments.
 
 Release checkouts, images and backups are retained for recovery. Prune them deliberately after reviewing `current_sha` and `previous_sha`; do not run volume-deleting cleanup against this project. Deployment rollback restores containers, not a database schema downgrade. Future migrations must remain compatible with the prior release or define an explicit recovery procedure. Backups are not automatically restored over newer data.
+
+Use the HTTPS lab URL for the eToro tab. It accepts `MFD_OPERATOR_TOKEN` from `~/.local/share/mfd/settings.env` for private account history and manual sync. The token stays in the current browser tab's memory. Replacing `ETORO_DEMO_USER_KEY` in the same file reloads the demo adapter after the updater observes the changed settings. The encryption key must stay stable to read past snapshots.
 
 This is the requested network-accessible fixture lab. Application authentication is still a roadmap item, Grafana allows anonymous viewing, and infrastructure uses development credentials. Network access is not a completed live-trading security deployment.

@@ -15,3 +15,23 @@ groups:
           severity: warning
         annotations:
           summary: A replay is queued for more than one minute
+      - alert: MFDDependencyUnavailable
+        expr: mfd_dependency_ready == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: An mfd dependency is unavailable
+      - alert: MFDOutboxStalled
+        expr: mfd_outbox_oldest_seconds > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: An unpublished mfd job is more than one minute old
+      - alert: MFDNewReplayFailure
+        expr: changes(mfd_runs{status="failed"}[5m]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: The durable failed-run count changed in the last five minutes

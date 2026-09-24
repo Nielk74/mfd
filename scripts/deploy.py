@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import datetime
 import fcntl
+import hashlib
 import json
 import logging
 import logging.handlers
@@ -61,7 +62,9 @@ class Deployer:
         self.env.update({"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
                          "DOCKER_CONTEXT": self.config["docker_context"], "GIT_TERMINAL_PROMPT": "0",
                          "GH_PROMPT_DISABLED": "1"})
-        for line in (root / "settings.env").read_text().splitlines():
+        settings_bytes = (root / "settings.env").read_bytes()
+        self.settings_sha256 = hashlib.sha256(settings_bytes).hexdigest()
+        for line in settings_bytes.decode().splitlines():
             if line.strip() and not line.lstrip().startswith("#"):
                 key, value = line.split("=", 1)
                 self.env[key.strip()] = value.strip().strip('"').strip("'")
@@ -192,6 +195,7 @@ class Deployer:
                 self.save(phase="rolled_back", failed_sha=sha, retry_after=time.time() + 600)
             raise
         self.save(phase="running", current_sha=sha, previous_sha=previous, deployed_at=now(),
+                  settings_sha256=self.settings_sha256,
                   failed_sha=None, retry_after=0, error=None)
         logging.info("Deployed and verified %s", sha)
         # The next scheduled invocation uses the updater from the accepted commit.
@@ -215,6 +219,11 @@ class Deployer:
                 logging.info("Restoring services for %s", current)
                 self.compose(current, "up", "-d", "--no-build", "--wait", "--wait-timeout", "120")
                 self.wait_healthy(current)
+            if self.state.get("settings_sha256") != self.settings_sha256:
+                logging.info("Applying updated private deployment settings")
+                self.compose(current, "up", "-d", "--no-build", "--wait", "--wait-timeout", "120")
+                self.wait_healthy(current)
+                self.save(settings_sha256=self.settings_sha256)
         sha = self.fetch()
         self.save(observed_sha=sha)
         if sha == current:

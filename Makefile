@@ -4,7 +4,10 @@ test:
 	python3 -m unittest discover -s scripts -p 'test_*.py'
 check: test
 	go vet ./...
+	python3 scripts/build_dashboards.py --check
 	docker compose config --quiet
+dashboards:
+	python3 scripts/build_dashboards.py
 up:
 	docker compose up -d --build --wait
 down:

@@ -1,147 +1,388 @@
 {
   "uid": "mfd-lab",
-  "title": "mfd / Fixture pipeline",
+  "title": "mfd / Portfolio & decisions",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": {
-    "from": "now-1h",
+    "from": "now-24h",
     "to": "now"
   },
+  "timezone": "browser",
   "tags": [
     "mfd",
-    "fixture"
+    "fixture",
+    "decisions"
+  ],
+  "links": [
+    {
+      "title": "Operations",
+      "type": "link",
+      "url": "/d/mfd-operations",
+      "targetBlank": true
+    },
+    {
+      "title": "Lab",
+      "type": "link",
+      "url": "https://mfd.aklein.fr",
+      "targetBlank": true
+    }
   ],
   "panels": [
     {
+      "id": 100,
+      "title": "Current artificial experiment \u00b7 latest completed run",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
       "id": 1,
-      "title": "API metrics available",
+      "title": "Final marked equity",
       "type": "stat",
+      "description": "USD midpoint value of fixed holdings at the last artificial observation. No realized strategy return.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 1,
         "w": 6,
         "h": 5
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=\"mfd\"}",
-          "legendFormat": "{{status}}"
+          "expr": "mfd_fixture_latest_equity_usd{scope=\"total\"}",
+          "legendFormat": "Total",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "decimals": 0
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
     },
     {
       "id": 2,
-      "title": "Completed fixture replays",
+      "title": "Unrealized P&L",
       "type": "stat",
+      "description": "Artificial mark minus fixed position cost. Excludes trading, fees and cash flows.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
       },
       "gridPos": {
         "x": 6,
-        "y": 0,
+        "y": 1,
         "w": 6,
         "h": 5
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "mfd_runs{status=\"completed\"}",
-          "legendFormat": "{{status}}"
+          "expr": "mfd_fixture_latest_unrealized_pnl_usd{scope=\"total\"}",
+          "legendFormat": "Total",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "decimals": 0
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
     },
     {
       "id": 3,
-      "title": "Queued replays",
+      "title": "Review decisions",
       "type": "stat",
+      "description": "Decisions asking for review in the latest completed fixture experiment. No order is sent.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
       },
       "gridPos": {
         "x": 12,
-        "y": 0,
+        "y": 1,
         "w": 6,
         "h": 5
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "mfd_runs{status=\"queued\"}",
-          "legendFormat": "{{status}}"
+          "expr": "mfd_fixture_latest_decisions{action=\"review\"}",
+          "legendFormat": "Review",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
           "decimals": 0
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
     },
     {
       "id": 4,
-      "title": "Oldest queued run (seconds)",
+      "title": "Enqueue \u2192 result",
       "type": "stat",
+      "description": "Elapsed wall time from accepting the replay to storing its result.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
       },
       "gridPos": {
         "x": 18,
-        "y": 0,
+        "y": 1,
         "w": 6,
         "h": 5
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "mfd_oldest_queued_seconds",
-          "legendFormat": "{{status}}"
+          "expr": "mfd_latest_run_duration_seconds",
+          "legendFormat": "Seconds",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "decimals": 0
+          "unit": "s",
+          "decimals": 2
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 101,
+      "title": "How artificial marks and decisions changed between runs",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
     },
     {
       "id": 5,
-      "title": "Runs by status",
+      "title": "Marked equity by sleeve",
       "type": "timeseries",
+      "description": "Latest completed artificial run sampled over wall clock. Each step reflects a new scenario; this is not a backtest equity curve.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 7,
         "w": 12,
-        "h": 9
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mfd_fixture_latest_equity_usd",
+          "legendFormat": "{{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Unrealized mark to cost by sleeve",
+      "type": "timeseries",
+      "description": "Fixed holdings marked with the latest scenario quotes; no trades or fees.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mfd-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mfd_fixture_latest_unrealized_pnl_usd",
+          "legendFormat": "{{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Decision actions in latest run",
+      "type": "timeseries",
+      "description": "HOLD and REVIEW are durable decision records, not orders.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mfd-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mfd_fixture_latest_decisions",
+          "legendFormat": "{{action}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Durable run counts",
+      "type": "timeseries",
+      "description": "Lifetime count by status in PostgreSQL.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mfd-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 8
       },
       "targets": [
         {
@@ -152,40 +393,35 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "unit": "short",
           "decimals": 0
         },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
     },
     {
-      "id": 6,
-      "title": "Unpublished outbox jobs",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mfd-prometheus"
-      },
+      "id": 102,
+      "title": "Read the underlying evidence",
+      "type": "text",
       "gridPos": {
-        "x": 12,
-        "y": 5,
-        "w": 12,
-        "h": 9
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "mfd_outbox_pending",
-          "legendFormat": "{{status}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 0
-        },
-        "overrides": []
-      },
-      "options": {}
+      "options": {
+        "mode": "markdown",
+        "content": "All portfolio values here are **artificial fixture results**. Open the [mfd lab](https://mfd.aklein.fr) for the selected run, quote snapshots, exact decimal values, decision checks and scenario comparison. Prometheus shows aggregate signals; the lab holds the individual records."
+      }
     }
   ]
 }

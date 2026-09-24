@@ -16,9 +16,19 @@ GitHub CI repeats Go checks, builds the Compose stack, and runs the smoke/recove
 
 ## eToro demo check
 
-Two read-only requests to the official demo P&L endpoint returned HTTP 403. The second probe classified the response as an edge rejection from known response text. No authenticated portfolio response was obtained, so key validity and account capabilities remain unverified. No orders were submitted. Credentials and response bodies are absent from the repository; only this sanitized outcome is retained.
+The initial key produced HTTP 403 on the official demo P&L endpoint; its response looked like an edge rejection. With the next supplied key, the watchlists endpoint returned HTTP 200, while demo portfolio and P&L returned HTTP 403 with an access/permission error. The latest supplied key also returned HTTP 403 with the same error category on the three documented demo reads: [portfolio breakdown](https://api-portal.etoro.com/api-reference/trading--demo/get-demo-portfolio-breakdown), [aggregated portfolio](https://api-portal.etoro.com/api-reference/trading--demo/get-aggregated-portfolio-snapshot) and [P&L](https://api-portal.etoro.com/api-reference/trading--demo/get-account-pnl-and-portfolio-details). Only GET requests were made. No account values or orders were saved, and credentials and response bodies are absent from the repository.
 
-The lab therefore remains in fixture mode. The next broker milestone needs successful authenticated demo access and sanitized contract fixtures. See [research](research/2026-09-25-foundations.md) for API assumptions still requiring verification.
+The error does not establish which specific permission is missing. [eToro's authentication guide](https://api-portal.etoro.com/getting-started/authentication) says a user key must be generated for the Demo environment with Read permission to access demo account data. The lab therefore remains in fixture mode. The next broker milestone needs a successful authenticated demo read and sanitized contract fixtures.
+
+## Interactive lab and monitoring extension
+
+- Isolated Compose project `mfd-next` built and started with its own PostgreSQL/NATS volumes, ports and Grafana, leaving the automatic `mfd` deployment untouched.
+- A named MSFT +10% final quote shock produced exact experiment-sleeve equity of $4,227.50 and combined equity of $10,207.50; earlier observations and the unshocked core sleeve were unchanged.
+- Concurrent baseline requests still created one run. Reusing an idempotency key with different experiment inputs returned HTTP 409. Queue state, recent jobs and synthetic product metrics matched durable results.
+- Browser checks at 1440×1050 and 390×844 created a Tech dip experiment, displayed $9,703.50, compared runs, filtered the decision journal, opened the captured snapshot, read queue/database state and downloaded valuation CSV. No page exceptions or horizontal overflow occurred.
+- Both provisioned Grafana dashboards loaded, and Prometheus returned the new synthetic equity, readiness and queue series. Stat panels were corrected to use instant queries after the first browser check showed missing data.
+- The isolated broker adapter used dummy credentials. Its background read recorded HTTP 401 without storing an account snapshot; unauthenticated snapshot access returned HTTP 401, while the operator-token protected view returned an empty history. The adapter tests also checked official request headers, exact decimal parsing, missing-field rejection, provider-error sanitization and authenticated encryption/tamper detection. A manual sync route has a response deadline longer than the provider request timeout.
+- `promtool` accepted all five alert rules; both dashboards rendered in a browser without page errors. The eToro tab passed desktop/mobile checks with no horizontal overflow.
 
 ## Network deployment and updates
 

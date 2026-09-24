@@ -4,13 +4,13 @@
 
 Research, architecture decisions, accounting/decision model, API contract and an executable fixture replay. Compose runs Go, PostgreSQL, Redis and NATS. The lab displays queue status, immutable replay results, sleeve marks and decision evidence. Optional Prometheus/Grafana provides initial infrastructure visibility. No real market feed, broker integration, model integration or order execution is enabled.
 
-The fixture is two fixed USD sleeves across three artificial quote observations. It is a pipeline demonstration, not a backtest or paper trading engine. It has no fills, fees, rebalancing or real strategy performance claim.
+The fixture is two fixed USD sleeves across three artificial quote observations. Named experiments can shock the final AAPL/MSFT quotes and adjust the review threshold. The lab compares runs, exports valuations and reads queue/database state. Two Grafana boards separate portfolio/decision aggregates from operations. It is still a pipeline and valuation demonstration, not a backtest or paper trading engine. It has no fills, fees, rebalancing or real strategy performance claim.
 
 ## 1 — eToro read-only vertical slice
 
 Resolve official REST/WebSocket schemas and capabilities with demo/read credentials. Add metadata, quote streaming, snapshot import, raw payload retention, gap detection and broker/local reconciliation. In the UI, show actual positions and provenance; keep copied/leveraged/unsupported products visible but explicitly unpriced internally.
 
-Done when: sanitized contract fixtures cover current schemas; demo disconnect/reconnect and quota tests pass; portfolio totals reconcile; unsupported products cannot enter execution. Needs user-owned eToro access, supplied outside the repository.
+Implemented slice: an official read-only aggregated demo portfolio client, an encrypted snapshot store, scheduled/manual sync, public access status, and an operator-token protected account view. The adapter validates a small set of account totals and asset aggregates; it does not infer missing values. Current gate: three successive supplied user keys have been tested read-only; the latest key returns HTTP 403 permission/access errors for demo portfolio, aggregate portfolio and P&L. A key with verified Demo + Read access is needed before an actual account snapshot can be imported. Remaining: metadata, streaming quotes, full broker lot import, reconciliation, disconnect/quota tests and verified totals. Unsupported products still cannot enter execution because execution is disabled.
 
 ## 2 — Accounting and virtual sleeves
 

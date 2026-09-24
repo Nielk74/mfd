@@ -18,7 +18,11 @@ Initial target objectives, to validate with actual provider limits: internal acc
 
 ## Infrastructure
 
-Foundation: structured JSON process logs, `/healthz`, dependency `/readyz`, Prometheus `/metrics`, optional provisioned Grafana dashboard and Prometheus rules. Metrics cover queued/completed runs, pending outbox, oldest queued age and scrape availability through `up`. Dependency readiness is a separate endpoint. Financial and model metrics above arrive with those modules; an absent series is not a green signal.
+Implemented: structured JSON process logs, `/healthz`, dependency `/readyz`, Prometheus `/metrics`, [portfolio and decisions](https://mfd-grafana.aklein.fr/d/mfd-lab) and [queue/database operations](https://mfd-grafana.aklein.fr/d/mfd-operations) dashboards, plus local alert rules. The lab's **Queues & database** view reads dependency probes, the NATS consumer, PostgreSQL run counts, outbox and recent job timestamps through `GET /api/v1/operations`.
+
+Metrics include run state, queue depth and redelivery, outbox count/age, oldest queued age, dependency readiness, storage size, latest run duration and the latest completed fixture's sleeve equity, unrealized mark-to-cost and decision counts. The eToro metrics contain only connector configuration, read success, HTTP status and encrypted snapshot count; account values are never exported to Prometheus. Product series are explicitly named `mfd_fixture_*`; they are absent until a fixture run completes. Their time axes show when experiments completed, not simulated investment performance. Prometheus may round numeric samples for display; PostgreSQL retains exact decimal strings.
+
+Rules detect an unavailable scrape/dependency, a queued run or unpublished outbox job older than one minute, and a change in failed-run count. The rules are local only; no notification destination is configured.
 
 Next: OpenTelemetry trace propagation through HTTP, outbox, NATS and execution; PostgreSQL/Redis/NATS exporters; disk capacity; backup age/restore outcomes; model/provider HTTP latency and rate limits. Keep run, order, user and instrument IDs out of metric labels; retain them in logs/traces/database records. Redact credentials and private response bodies at the boundary.
 

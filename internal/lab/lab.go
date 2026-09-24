@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -60,8 +61,45 @@ type Decision struct {
 type Result struct {
 	DatasetHash      string     `json:"dataset_hash"`
 	ValuationVersion string     `json:"valuation_version"`
+	Experiment       Experiment `json:"experiment"`
 	Snapshots        []Snapshot `json:"snapshots"`
 	Decisions        []Decision `json:"decisions"`
+}
+
+// Experiment changes only the final artificial observation. It cannot change
+// holdings, submit an order, or be mistaken for an observed market feed.
+type Experiment struct {
+	Name               string         `json:"name"`
+	FinalShockBPS      map[string]int `json:"final_shock_bps"`
+	ReviewThresholdBPS int            `json:"review_threshold_bps"`
+}
+
+func NormalizeExperiment(e Experiment) (Experiment, error) {
+	e.Name = strings.TrimSpace(e.Name)
+	if e.Name == "" {
+		e.Name = "Baseline"
+	}
+	if len(e.Name) > 60 || strings.ContainsAny(e.Name, "\r\n\t") {
+		return Experiment{}, fmt.Errorf("name must be at most 60 characters on one line")
+	}
+	if e.ReviewThresholdBPS == 0 {
+		e.ReviewThresholdBPS = 100
+	}
+	if e.ReviewThresholdBPS < 1 || e.ReviewThresholdBPS > 5000 {
+		return Experiment{}, fmt.Errorf("review_threshold_bps must be 1..5000")
+	}
+	if e.FinalShockBPS == nil {
+		e.FinalShockBPS = map[string]int{}
+	}
+	for symbol, bps := range e.FinalShockBPS {
+		if symbol != "AAPL" && symbol != "MSFT" {
+			return Experiment{}, fmt.Errorf("final_shock_bps supports AAPL and MSFT only")
+		}
+		if bps < -5000 || bps > 5000 {
+			return Experiment{}, fmt.Errorf("final_shock_bps must be -5000..5000")
+		}
+	}
+	return e, nil
 }
 
 func DatasetHash() string { s := sha256.Sum256(fixture); return hex.EncodeToString(s[:]) }
@@ -111,7 +149,13 @@ func Value(s Sleeve, quotes []Quote, at time.Time, maxAge time.Duration) (Snapsh
 	return out, nil
 }
 
-func Replay() (Result, error) {
+func Replay() (Result, error) { return ReplayExperiment(Experiment{}) }
+
+func ReplayExperiment(input Experiment) (Result, error) {
+	experiment, err := NormalizeExperiment(input)
+	if err != nil {
+		return Result{}, err
+	}
 	var data struct {
 		Sleeves      []Sleeve `json:"sleeves"`
 		Observations []struct {
@@ -122,8 +166,16 @@ func Replay() (Result, error) {
 	if err := json.Unmarshal(fixture, &data); err != nil {
 		return Result{}, err
 	}
-	result := Result{DatasetHash: DatasetHash(), ValuationVersion: "usd-long-spot-mid-v1"}
+	result := Result{DatasetHash: DatasetHash(), ValuationVersion: "usd-long-spot-mid-v1", Experiment: experiment}
 	for i, obs := range data.Observations {
+		if i == len(data.Observations)-1 {
+			for j := range obs.Quotes {
+				bps := experiment.FinalShockBPS[obs.Quotes[j].Symbol]
+				factor := decimal.NewFromInt(int64(10000 + bps)).Div(decimal.NewFromInt(10000))
+				obs.Quotes[j].Bid = obs.Quotes[j].Bid.Mul(factor)
+				obs.Quotes[j].Ask = obs.Quotes[j].Ask.Mul(factor)
+			}
+		}
 		for _, s := range data.Sleeves {
 			snap, err := Value(s, obs.Quotes, obs.At, 5*time.Minute)
 			if err != nil {
@@ -132,11 +184,12 @@ func Replay() (Result, error) {
 			decision := Decision{ID: fmt.Sprintf("%s-%d", s.ID, i), Sleeve: s.ID, At: obs.At, Actor: "fixture-worker", Strategy: s.Strategy, Action: "hold", Reason: "Fixed holdings baseline. No order proposed.", Checks: []string{"USD unlevered long positions", "Valid bid/ask within replay freshness limit", "Execution unavailable in fixture mode"}, SnapshotIndex: len(result.Snapshots)}
 			if s.Strategy == "review-move-v1" {
 				basis := snap.MarketValue.Sub(snap.UnrealizedPnL)
-				if basis.IsPositive() && snap.UnrealizedPnL.Abs().GreaterThanOrEqual(basis.Mul(decimal.RequireFromString("0.01"))) {
+				threshold := decimal.NewFromInt(int64(experiment.ReviewThresholdBPS)).Div(decimal.NewFromInt(10000))
+				if basis.IsPositive() && snap.UnrealizedPnL.Abs().GreaterThanOrEqual(basis.Mul(threshold)) {
 					decision.Action = "review"
-					decision.Reason = "Unrealized move reached 1% of cost basis. Review recorded; holdings unchanged."
+					decision.Reason = fmt.Sprintf("Unrealized move reached %s%% of cost basis. Review recorded; holdings unchanged.", decimal.NewFromInt(int64(experiment.ReviewThresholdBPS)).Div(decimal.NewFromInt(100)).String())
 				} else {
-					decision.Reason = "Unrealized move below 1% of cost basis. Holdings unchanged."
+					decision.Reason = fmt.Sprintf("Unrealized move below %s%% of cost basis. Holdings unchanged.", decimal.NewFromInt(int64(experiment.ReviewThresholdBPS)).Div(decimal.NewFromInt(100)).String())
 				}
 			}
 			result.Snapshots = append(result.Snapshots, snap)

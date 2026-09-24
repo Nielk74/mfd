@@ -13,6 +13,10 @@ services:
       DATABASE_URL: postgres://mfd:mfd-local@postgres:5432/mfd?sslmode=disable
       REDIS_ADDR: redis:6379
       NATS_URL: nats://nats:4222
+      ETORO_API_KEY: ${ETORO_API_KEY:-}
+      ETORO_DEMO_USER_KEY: ${ETORO_DEMO_USER_KEY:-}
+      MFD_ACCOUNT_ENCRYPTION_KEY: ${MFD_ACCOUNT_ENCRYPTION_KEY:-}
+      MFD_OPERATOR_TOKEN: ${MFD_OPERATOR_TOKEN:-}
     ports:
       - "${MFD_BIND_ADDRESS:-0.0.0.0}:${MFD_PORT:-8088}:8080"
     depends_on:

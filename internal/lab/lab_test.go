@@ -76,3 +76,30 @@ func TestReplayReproducibilityAndConservation(t *testing.T) {
 		t.Fatal("wrong decision")
 	}
 }
+func TestScenarioChangesOnlyFinalArtificialObservation(t *testing.T) {
+	base, err := Replay()
+	if err != nil {
+		t.Fatal(err)
+	}
+	shifted, err := ReplayExperiment(Experiment{Name: "MSFT +10%", FinalShockBPS: map[string]int{"MSFT": 1000}, ReviewThresholdBPS: 200})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		if !base.Snapshots[i].Equity.Equal(shifted.Snapshots[i].Equity) {
+			t.Fatalf("earlier observation %d changed", i)
+		}
+	}
+	if !base.Snapshots[4].Equity.Equal(shifted.Snapshots[4].Equity) {
+		t.Fatal("unshocked core changed")
+	}
+	if !shifted.Snapshots[5].Equity.Equal(d("4227.5")) {
+		t.Fatalf("wrong exact scenario equity: %s", shifted.Snapshots[5].Equity)
+	}
+	if shifted.Decisions[5].Action != "review" {
+		t.Fatal("scenario decision missing")
+	}
+	if shifted.Experiment.Name != "MSFT +10%" {
+		t.Fatal("scenario provenance missing")
+	}
+}

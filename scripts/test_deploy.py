@@ -59,6 +59,22 @@ class DeploymentTests(unittest.TestCase):
                 self.assertEqual(deployer.state["failed_sha"], "b" * 40)
                 self.assertEqual(compose.call_args_list[-1].args[0], "a" * 40)
 
+    def test_changed_private_settings_recreate_current_release(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "config.json").write_text(json.dumps({"repository": "Nielk74/mfd", "branch": "main",
+                                                        "project": "mfd", "docker_context": "colima"}))
+            (root / "settings.env").write_text("ETORO_DEMO_USER_KEY=new-private-key\n")
+            atomic_json(root / "status.json", {"current_sha": "a" * 40, "settings_sha256": "old"})
+            deployer = Deployer(root)
+            with patch.object(deployer, "runtime"), patch.object(deployer, "verify"), \
+                 patch.object(deployer, "compose") as compose, \
+                 patch.object(deployer, "wait_healthy"), \
+                 patch.object(deployer, "fetch", return_value="a" * 40):
+                deployer.tick()
+                self.assertEqual(compose.call_count, 1)
+                self.assertEqual(deployer.state["settings_sha256"], deployer.settings_sha256)
+
 
 if __name__ == "__main__":
     unittest.main()

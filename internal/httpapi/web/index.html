@@ -3,161 +3,114 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>mfd · metro finance dodo</title>
+    <meta name="theme-color" content="#111d22" />
+    <title>mfd · research workspace</title>
     <link rel="stylesheet" href="/style.css" />
     <script defer src="/app.js"></script>
   </head>
   <body>
-    <a class="skip" href="#main">Skip to lab</a>
-    <header>
-      <a class="brand" href="/">mfd<span>metro finance dodo</span></a
-      ><span class="mode">Fixture lab</span
-      ><a href="https://github.com/Nielk74/mfd/tree/main/docs"
-        >Project docs ↗</a
-      >
+    <a class="skip" href="#main">Skip to workspace</a>
+    <header class="topbar">
+      <a class="brand" href="/"><span class="brand-mark">m</span><span>mfd<small>metro finance dodo</small></span></a>
+      <nav aria-label="Workspace views" class="primary-nav">
+        <button class="nav-button active" data-view="workspace" aria-current="page">Workspace</button>
+        <button class="nav-button" data-view="decisions">Decisions</button>
+        <button class="nav-button" data-view="systems">Queues &amp; database</button>
+        <button class="nav-button" data-view="broker">eToro</button>
+      </nav>
+      <span class="environment">FIXTURE MODE</span>
     </header>
     <main id="main">
-      <section class="intro">
+      <section class="hero">
         <div>
-          <p class="eyebrow">PORTFOLIOS / DECISIONS / EVIDENCE</p>
-          <h1>Know what happened.</h1>
-          <p>
-            Inspect a portfolio, follow each decision, compare the evidence.
-          </p>
+          <p class="eyebrow">PORTFOLIO RESEARCH / DECISION EVIDENCE</p>
+          <h1>A clear record of every move.</h1>
+          <p>Shape an artificial market observation, run it through the same valuation path, and inspect every decision and input.</p>
         </div>
-        <button id="replay">
-          Run fixture replay <span aria-hidden="true">↗</span>
-        </button>
+        <div class="hero-side">
+          <span class="live-dot" aria-hidden="true"></span><span id="connection">Checking lab</span>
+          <button id="hero-create" class="primary">New experiment <span aria-hidden="true">↗</span></button>
+        </div>
       </section>
-      <div class="notice">
-        <strong>Artificial data. Fixed holdings.</strong> This build replays
-        three quote observations through two virtual sleeves. No broker, AI
-        model or order execution is connected.
+      <div class="fixture-notice"><strong>Artificial data</strong><span>Two fixed virtual sleeves, three quote observations. Scenarios change the last quote only. These marks are not historical returns; no broker or execution is connected.</span></div>
+      <p id="status" role="status" aria-live="polite" class="status-line">Loading workspace…</p>
+
+      <div class="summary-grid" aria-label="Selected experiment summary">
+        <article class="summary-card"><span>Marked equity</span><strong id="equity">—</strong><small>USD · final artificial mark</small></article>
+        <article class="summary-card"><span>Unrealized P&amp;L</span><strong id="pnl">—</strong><small>Against fixed position cost</small></article>
+        <article class="summary-card"><span>Review decisions</span><strong id="review-count">—</strong><small>Recorded, never executed</small></article>
+        <article class="summary-card"><span>Queued jobs</span><strong id="queue-count">—</strong><small>PostgreSQL outbox + NATS</small></article>
       </div>
-      <p id="status" role="status" aria-live="polite">Checking the lab…</p>
-      <div class="workspace">
-        <aside>
-          <div class="section-head">
-            <h2>Replays</h2>
-            <span id="run-count">0</span>
-          </div>
-          <p class="muted">Latest 50 · stored across restarts</p>
-          <div id="runs" class="run-list">
-            <p>No runs yet. Start a fixture replay.</p>
-          </div>
-        </aside>
-        <div class="detail">
-          <section class="run-heading">
-            <div>
-              <p class="eyebrow">SELECTED REPLAY</p>
-              <h2 id="run-title">Your lab starts here.</h2>
-              <p id="run-meta" class="muted">
-                Run the fixture to inspect its valuation and decision trail.
-              </p>
+
+      <section id="workspace-view" class="view" aria-label="Workspace">
+        <div class="work-grid">
+          <section class="surface composer" id="composer">
+            <div class="section-heading"><div><p class="eyebrow">CREATE / EXPERIMENT</p><h2>Test an idea</h2></div><span class="round-icon">↗</span></div>
+            <p class="section-copy">Adjust the final artificial quotes and review threshold. Holdings and cash stay fixed.</p>
+            <div class="presets" aria-label="Experiment presets">
+              <button class="chip selected" data-preset="baseline">Baseline</button>
+              <button class="chip" data-preset="dip">Tech dip</button>
+              <button class="chip" data-preset="rally">Tech rally</button>
+              <button class="chip" data-preset="sensitive">Sensitive review</button>
             </div>
-            <a id="export" hidden>View JSON ↗</a>
+            <form id="experiment-form">
+              <label>Experiment name<input id="experiment-name" name="name" maxlength="60" value="Baseline" required /></label>
+              <div class="field-pair">
+                <label>AAPL final shock <span>%</span><input id="aapl-shock" name="aapl" type="number" min="-50" max="50" step="0.01" value="0" required /></label>
+                <label>MSFT final shock <span>%</span><input id="msft-shock" name="msft" type="number" min="-50" max="50" step="0.01" value="0" required /></label>
+              </div>
+              <label>Review move at <span>% of cost</span><input id="review-threshold" name="threshold" type="number" min="0.01" max="50" step="0.01" value="1" required /></label>
+              <button id="replay" class="primary" type="submit">Run experiment <span aria-hidden="true">→</span></button>
+            </form>
           </section>
-          <div id="result" hidden>
-            <div class="metrics">
-              <article>
-                <p>Final marked equity</p>
-                <strong id="equity">—</strong
-                ><small>USD · midpoint marks</small>
-              </article>
-              <article>
-                <p>Unrealized P&amp;L</p>
-                <strong id="pnl">—</strong
-                ><small>Against fixed holding cost</small>
-              </article>
-              <article>
-                <p>Recorded decisions</p>
-                <strong id="decisions-count">—</strong
-                ><small>Includes hold and review</small>
-              </article>
-            </div>
-            <section>
-              <div class="section-head">
-                <h2>Virtual sleeves</h2>
-                <span>Final observation</span>
-              </div>
-              <div class="table-wrap">
-                <table>
-                  <caption class="sr-only">
-                    Final portfolio valuations by sleeve
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th>Sleeve</th>
-                      <th>Cash</th>
-                      <th>Equity</th>
-                      <th>Liquidation value</th>
-                      <th>Unrealized P&amp;L</th>
-                    </tr>
-                  </thead>
-                  <tbody id="sleeves"></tbody>
-                </table>
-              </div>
-            </section>
-            <section>
-              <div class="section-head">
-                <h2>Valuation over time</h2>
-                <span>Fixture clock · UTC</span>
-              </div>
-              <p class="muted">
-                Fixed units and cash. These changes are marks, not a strategy
-                return.
-              </p>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Observation</th>
-                      <th>Combined equity</th>
-                      <th>Unrealized P&amp;L</th>
-                    </tr>
-                  </thead>
-                  <tbody id="history"></tbody>
-                </table>
-              </div>
-            </section>
-            <section>
-              <div class="section-head">
-                <h2>Decision journal</h2>
-                <label
-                  >Sleeve
-                  <select id="filter">
-                    <option value="all">All</option>
-                    <option value="core">Core</option>
-                    <option value="experiment">Experiment</option>
-                  </select></label
-                >
-              </div>
-              <div id="decisions" class="journal"></div>
-            </section>
-            <details class="provenance">
-              <summary>Data and calculation versions</summary>
-              <dl>
-                <dt>Dataset SHA-256</dt>
-                <dd id="hash"></dd>
-                <dt>Valuation policy</dt>
-                <dd id="policy"></dd>
-                <dt>Execution</dt>
-                <dd>
-                  Unavailable in this build. Review decisions do not alter
-                  holdings.
-                </dd>
-              </dl>
-            </details>
-          </div>
+          <section class="surface run-browser">
+            <div class="section-heading"><div><p class="eyebrow">HISTORY / POSTGRESQL</p><h2>Experiments</h2></div><span id="run-count" class="count">0</span></div>
+            <label class="search-label">Search runs<input id="run-search" type="search" placeholder="Name or run ID" /></label>
+            <div id="runs" class="run-list"><p class="empty">No experiments yet. Run one to begin.</p></div>
+            <p class="footnote">Latest 50 runs · durable across restarts</p>
+          </section>
         </div>
-      </div>
-      <footer>
-        <span id="health">Dependencies: checking</span>
-        <span id="revision">Build: checking</span>
-        <span
-          >Every displayed value belongs to the selected fixture replay.</span
-        >
-      </footer>
+        <section class="surface selected-run" id="selected-run">
+          <div class="section-heading detail-heading"><div><p class="eyebrow">SELECTED / INSPECT</p><h2 id="run-title">Choose an experiment</h2><p id="run-meta" class="muted">Create or select a run to see its portfolio and decisions.</p></div>
+            <div class="actions"><button id="copy-link" class="secondary" disabled>Copy link</button><button id="download-csv" class="secondary" disabled>Export CSV</button><a id="export" class="secondary" hidden>View JSON ↗</a></div>
+          </div>
+          <div id="result" hidden>
+            <div class="selected-facts"><span id="scenario-fact">—</span><span id="threshold-fact">—</span><span id="run-clock">—</span></div>
+            <div class="chart-grid">
+              <section class="inner-panel"><div class="section-heading"><div><h3>Marked equity</h3><p class="muted">Three artificial observations · USD</p></div><span class="small-tag">FIXTURE CLOCK</span></div><div id="equity-chart" class="chart" role="img" aria-label="Equity over fixture observations"></div><div id="chart-legend" class="chart-legend"></div></section>
+              <section class="inner-panel compare-panel"><div class="section-heading"><div><h3>Compare experiments</h3><p class="muted">Same holdings and fixture; changed assumptions</p></div></div><label>Compare selected run with<select id="compare-select"><option value="">Choose a completed run</option></select></label><div id="comparison" class="comparison"><p class="empty">Select another run to see the final mark and decision difference.</p></div></section>
+            </div>
+            <div class="section-heading block-heading"><div><h3>Virtual sleeves</h3><p class="muted">Fixed positions · final observation</p></div><span class="small-tag">USD</span></div>
+            <div id="sleeves" class="sleeve-grid"></div>
+            <details class="raw-details"><summary>Data source and calculation versions</summary><dl><dt>Dataset SHA-256</dt><dd id="hash"></dd><dt>Valuation policy</dt><dd id="policy"></dd><dt>Execution</dt><dd>Unavailable. A review decision does not change holdings.</dd></dl></details>
+          </div>
+        </section>
+      </section>
+
+      <section id="decisions-view" class="view" aria-label="Decisions" hidden>
+        <div class="page-heading"><div><p class="eyebrow">TRACE / EXPLAIN</p><h2>Decision journal</h2><p>Each row keeps its reason, checks and exact input snapshot.</p></div><span id="decision-total" class="count">0</span></div>
+        <div class="surface decisions-surface"><div class="toolbar"><label>Sleeve<select id="filter"><option value="all">All sleeves</option><option value="core">Core</option><option value="experiment">Experiment</option></select></label><label>Action<select id="action-filter"><option value="all">All actions</option><option value="review">Review</option><option value="hold">Hold</option></select></label><label>Search<input id="decision-search" type="search" placeholder="Reason or strategy" /></label></div><div id="decisions" class="journal"><p class="empty">Select a completed experiment to inspect decisions.</p></div></div>
+      </section>
+
+      <section id="systems-view" class="view" aria-label="Queues and database" hidden>
+        <div class="page-heading"><div><p class="eyebrow">OPERATIONS / INSPECT</p><h2>Queues &amp; database</h2><p>Read-only operational view of the same pipeline the lab uses.</p></div><button id="refresh-ops" class="secondary">Refresh now</button></div>
+        <div id="dependency-cards" class="dependency-grid"></div>
+        <div class="ops-grid">
+          <section class="surface"><div class="section-heading"><div><p class="eyebrow">NATS / JETSTREAM</p><h3>Replay queue</h3></div><span id="queue-state" class="small-tag">Checking</span></div><div class="ops-metrics"><div><span>Messages in stream</span><strong id="stream-messages">—</strong></div><div><span>Awaiting worker</span><strong id="queue-pending">—</strong></div><div><span>Awaiting ack</span><strong id="queue-ack">—</strong></div><div><span>Redelivered</span><strong id="queue-redelivered">—</strong></div></div><p id="queue-detail" class="footnote">Stream MFD_JOBS · consumer replay-workers</p></section>
+          <section class="surface"><div class="section-heading"><div><p class="eyebrow">POSTGRESQL / DURABLE STATE</p><h3>Stored work</h3></div><span id="db-state" class="small-tag">Checking</span></div><div class="ops-metrics"><div><span>Completed</span><strong id="db-completed">—</strong></div><div><span>Queued</span><strong id="db-queued">—</strong></div><div><span>Failed</span><strong id="db-failed">—</strong></div><div><span>Outbox unpublished</span><strong id="db-outbox">—</strong></div></div><p id="db-detail" class="footnote">Runs and outbox size: —</p></section>
+        </div>
+        <section class="surface job-surface"><div class="section-heading"><div><p class="eyebrow">PIPELINE / AUDIT</p><h3>Recent jobs</h3></div><span id="ops-updated" class="muted">—</span></div><div class="table-scroll"><table><thead><tr><th>Experiment</th><th>Run</th><th>Status</th><th>Enqueued</th><th>Published</th><th>Finished</th></tr></thead><tbody id="job-rows"><tr><td colspan="6">Loading jobs…</td></tr></tbody></table></div></section>
+        <div class="observability-links"><a href="https://mfd-grafana.aklein.fr/d/mfd-lab" target="_blank" rel="noopener">Open Grafana dashboard ↗</a><a href="https://mfd-prometheus.aklein.fr" target="_blank" rel="noopener">Explore Prometheus ↗</a></div>
+      </section>
+      <section id="broker-view" class="view" aria-label="eToro demo account" hidden>
+        <div class="page-heading"><div><p class="eyebrow">PROVIDER / DEMO ACCOUNT</p><h2>eToro connection</h2><p>Official read-only portfolio import. Account details require an operator token.</p></div><span id="broker-badge" class="small-tag">CHECKING</span></div>
+        <div class="ops-grid">
+          <section class="surface"><div class="section-heading"><div><p class="eyebrow">ACCESS / LAST CHECK</p><h3>Connection state</h3></div></div><div class="ops-metrics"><div><span>Demo portfolio</span><strong id="broker-result">—</strong></div><div><span>HTTP status</span><strong id="broker-http">—</strong></div><div><span>Last attempt</span><strong id="broker-attempt" class="small-value">—</strong></div><div><span>Snapshots saved</span><strong id="broker-snapshots">—</strong></div></div><p class="footnote">The adapter uses the official demo aggregated portfolio endpoint. A denied read never becomes a portfolio valuation.</p></section>
+          <section class="surface"><div class="section-heading"><div><p class="eyebrow">OPERATOR / PRIVATE</p><h3>Inspect account history</h3></div></div><p class="section-copy">Use the operator token from this machine’s private deployment settings. It stays in this browser tab’s memory.</p><label>Operator token<input id="operator-token" type="password" autocomplete="off" placeholder="Paste token to unlock account view" /></label><div class="broker-actions"><button id="broker-unlock" class="primary">Unlock account view</button><button id="broker-sync" class="secondary" disabled>Sync now</button></div><p id="broker-message" class="muted">Portfolio values are hidden until unlocked.</p></section>
+        </div>
+        <section id="broker-history" class="surface broker-history" hidden><div class="section-heading"><div><p class="eyebrow">ACCOUNT / OBSERVED SNAPSHOTS</p><h3>Demo portfolio over time</h3></div><span id="broker-count" class="count">0</span></div><div id="broker-chart" class="chart" role="img" aria-label="Observed eToro demo account totals"></div><div id="broker-records" class="table-scroll"></div><p class="footnote">These are provider-reported demo values, separate from artificial fixture sleeves. Raw responses are encrypted before storage.</p></section>
+      </section>
+      <footer><span id="health">Dependencies: checking</span><span id="revision">Build: checking</span><span>Artificial experiment data · no eToro account values</span></footer>
     </main>
   </body>
 </html>

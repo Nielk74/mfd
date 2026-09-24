@@ -36,7 +36,7 @@ flowchart LR
 
 PostgreSQL is authoritative. Redis can be emptied without losing decisions or money. NATS carries work and events; consumers acknowledge only after durable effects commit. Market history moves to compressed Parquet/object storage once measured retention justifies it; avoid adding another database now.
 
-The Compose baseline is one host, one replica per dependency, persistent volumes and ports bound to all host interfaces. The requested Mac deployment includes automatic updates and Caddy HTTPS for the web interfaces; see [deployment](deployment.md). It is a development topology, not high availability. Authentication, secret management and tested restores remain prerequisites for live trading.
+The Compose baseline is one host, one replica per dependency, persistent volumes and ports bound to all host interfaces. The requested Mac deployment includes automatic updates and Caddy HTTPS for the web interfaces; see [deployment](deployment.md). The read-only eToro demo adapter polls the official aggregated portfolio endpoint separately from artificial experiments. Successful raw responses are encrypted in PostgreSQL; account values are returned only through an operator-token protected API. A denied or malformed response records a status without creating a snapshot. It is a development topology, not high availability. Full authentication, tested restores and execution controls remain prerequisites for live trading.
 
 ## Modules and contracts
 
