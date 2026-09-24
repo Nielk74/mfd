@@ -33,7 +33,7 @@ def note(pid, title, y, content):
     return {'id': pid, 'title': title, 'type': 'text', 'gridPos': {'x': 0, 'y': y, 'w': 24, 'h': 3}, 'options': {'mode': 'markdown', 'content': content}}
 
 def dashboard(uid, title, tags, panels, links):
-    return {'uid': uid, 'title': title, 'schemaVersion': 41, 'version': 2, 'refresh': '10s', 'time': {'from': 'now-24h', 'to': 'now'}, 'timezone': 'browser', 'tags': tags, 'links': [{'title': name, 'type': 'link', 'url': url, 'targetBlank': True} for name, url in links], 'panels': panels}
+    return {'uid': uid, 'title': title, 'schemaVersion': 41, 'version': 3, 'refresh': '10s', 'time': {'from': 'now-1h', 'to': 'now'}, 'timezone': 'browser', 'tags': tags, 'links': [{'title': name, 'type': 'link', 'url': url, 'targetBlank': True} for name, url in links], 'panels': panels}
 
 lab = [
     row(100, 'Current artificial experiment · latest completed run', 0),
@@ -52,12 +52,12 @@ lab[1]['fieldConfig']['defaults']['color'] = {'mode': 'fixed', 'fixedColor': 'gr
 lab[2]['fieldConfig']['defaults']['thresholds'] = {'mode': 'absolute', 'steps': [{'color': 'red', 'value': None}, {'color': 'green', 'value': 0}]}
 ops = [
     row(100, 'Availability and backlog', 0),
-    panel(1, 'API scrape', 'stat', 0, 1, 4, 5, [('up{job="mfd"}', 'Scrape')], '1 means Prometheus reached /metrics. Check individual dependencies below.', 'short', 0),
-    panel(2, 'Dependencies ready', 'stat', 4, 1, 4, 5, [('sum(mfd_dependency_ready)', 'of 3')], 'PostgreSQL, NATS and Redis ready probes. Expected value is 3.', 'short', 0),
-    panel(3, 'Queued runs', 'stat', 8, 1, 4, 5, [('mfd_runs{status="queued"}', 'Queued')], 'Accepted in PostgreSQL but not yet completed.', 'short', 0),
-    panel(4, 'Outbox unpublished', 'stat', 12, 1, 4, 5, [('mfd_outbox_pending', 'Pending')], 'Durable jobs not yet published to NATS.', 'short', 0),
-    panel(5, 'Oldest queued', 'stat', 16, 1, 4, 5, [('mfd_oldest_queued_seconds', 'Seconds')], 'Age of oldest queued run. Zero when empty.', 's', 0),
-    panel(6, 'Oldest unpublished', 'stat', 20, 1, 4, 5, [('mfd_outbox_oldest_seconds', 'Seconds')], 'Age of oldest unpublished outbox job. Zero when empty.', 's', 0),
+    panel(1, 'API', 'stat', 0, 1, 4, 5, [('up{job="mfd"}', 'Scrape')], '1 means Prometheus reached /metrics. Check individual dependencies below.', 'short', 0),
+    panel(2, 'Ready deps', 'stat', 4, 1, 4, 5, [('sum(mfd_dependency_ready)', 'of 3')], 'PostgreSQL, NATS and Redis ready probes. Expected value is 3.', 'short', 0),
+    panel(3, 'Queued', 'stat', 8, 1, 4, 5, [('mfd_runs{status="queued"}', 'Queued')], 'Accepted in PostgreSQL but not yet completed.', 'short', 0),
+    panel(4, 'Outbox', 'stat', 12, 1, 4, 5, [('mfd_outbox_pending', 'Pending')], 'Durable jobs not yet published to NATS.', 'short', 0),
+    panel(5, 'Queue age', 'stat', 16, 1, 4, 5, [('mfd_oldest_queued_seconds', 'Seconds')], 'Age of oldest queued run. Zero when empty.', 's', 0),
+    panel(6, 'Outbox age', 'stat', 20, 1, 4, 5, [('mfd_outbox_oldest_seconds', 'Seconds')], 'Age of oldest unpublished outbox job. Zero when empty.', 's', 0),
     row(101, 'Work moving through the pipeline', 6),
     panel(7, 'Run state', 'timeseries', 0, 7, 12, 8, [('mfd_runs', '{{status}}')], 'Durable run totals, sampled every 15 seconds.', 'short', 0),
     panel(8, 'NATS consumer', 'timeseries', 12, 7, 12, 8, [('mfd_queue_pending_messages', 'Waiting'), ('mfd_queue_ack_pending_messages', 'Awaiting ack'), ('mfd_queue_redelivered_messages', 'Redelivered')], 'Messages in the durable replay consumer. The queue can be empty while runs remain stored.', 'short', 0),

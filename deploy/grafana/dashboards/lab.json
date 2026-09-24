@@ -2,10 +2,10 @@
   "uid": "mfd-lab",
   "title": "mfd / Portfolio & decisions",
   "schemaVersion": 41,
-  "version": 2,
+  "version": 3,
   "refresh": "10s",
   "time": {
-    "from": "now-24h",
+    "from": "now-1h",
     "to": "now"
   },
   "timezone": "browser",

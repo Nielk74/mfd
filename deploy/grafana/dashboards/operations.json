@@ -2,10 +2,10 @@
   "uid": "mfd-operations",
   "title": "mfd / Queue & database operations",
   "schemaVersion": 41,
-  "version": 2,
+  "version": 3,
   "refresh": "10s",
   "time": {
-    "from": "now-24h",
+    "from": "now-1h",
     "to": "now"
   },
   "timezone": "browser",
@@ -43,7 +43,7 @@
     },
     {
       "id": 1,
-      "title": "API scrape",
+      "title": "API",
       "type": "stat",
       "description": "1 means Prometheus reached /metrics. Check individual dependencies below.",
       "datasource": {
@@ -88,7 +88,7 @@
     },
     {
       "id": 2,
-      "title": "Dependencies ready",
+      "title": "Ready deps",
       "type": "stat",
       "description": "PostgreSQL, NATS and Redis ready probes. Expected value is 3.",
       "datasource": {
@@ -133,7 +133,7 @@
     },
     {
       "id": 3,
-      "title": "Queued runs",
+      "title": "Queued",
       "type": "stat",
       "description": "Accepted in PostgreSQL but not yet completed.",
       "datasource": {
@@ -178,7 +178,7 @@
     },
     {
       "id": 4,
-      "title": "Outbox unpublished",
+      "title": "Outbox",
       "type": "stat",
       "description": "Durable jobs not yet published to NATS.",
       "datasource": {
@@ -223,7 +223,7 @@
     },
     {
       "id": 5,
-      "title": "Oldest queued",
+      "title": "Queue age",
       "type": "stat",
       "description": "Age of oldest queued run. Zero when empty.",
       "datasource": {
@@ -268,7 +268,7 @@
     },
     {
       "id": 6,
-      "title": "Oldest unpublished",
+      "title": "Outbox age",
       "type": "stat",
       "description": "Age of oldest unpublished outbox job. Zero when empty.",
       "datasource": {
