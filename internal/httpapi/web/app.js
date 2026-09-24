@@ -202,6 +202,13 @@ async function health() {
   } catch {
     $("health").textContent = "Dependency status unavailable";
   }
+  try {
+    const { revision } = await request("/healthz");
+    $("revision").textContent =
+      `Build: ${revision === "development" ? revision : revision.slice(0, 8)}`;
+  } catch {
+    $("revision").textContent = "Build: unavailable";
+  }
 }
 refresh();
 health();

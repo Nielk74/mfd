@@ -20,6 +20,14 @@ Two read-only requests to the official demo P&L endpoint returned HTTP 403. The 
 
 The lab therefore remains in fixture mode. The next broker milestone needs successful authenticated demo access and sanitized contract fixtures. See [research](research/2026-09-25-foundations.md) for API assumptions still requiring verification.
 
+## Network deployment and updates
+
+The Mac publishes the lab, Grafana, Prometheus, PostgreSQL, Redis and NATS on `0.0.0.0`. All seven published ports were reached through its LAN address. Browser replay checks passed at desktop/mobile widths through both LAN HTTP and `https://mfd.aklein.fr`. Caddy serves the lab, Grafana and Prometheus with valid HTTPS; its pre-existing routes were preserved and a configuration snapshot saved.
+
+The installed cron updater was observed waiting for CI on commit `8dd183d`, then building and deploying it without a manual deployment command. The public health endpoint reported that exact compiled commit. A replay created before the deployment remained queryable afterward. The updater saved a PostgreSQL backup, retained named volumes and left unrelated cron entries unchanged.
+
+Updater tests cover exact-SHA push CI gating, latest failed-run rejection, cron installation idempotency, exclusive locking and rollback after failed candidate health. Reboot recovery is configured but an actual Mac reboot was not performed. Container rollback does not automatically reverse database migrations. See [deployment operations](deployment.md).
+
 ## Limits
 
-This does not validate real strategy performance, broker accounting, execution, Jev integration, backups, public deployment or high availability. Fixture observations are artificial and do not represent live or historical market results. Authentication, a complete financial ledger and general job administration are planned in the [delivery plan](roadmap.md).
+This does not validate real strategy performance, broker accounting, execution, Jev integration, full backup restoration or high availability. Fixture observations are artificial and do not represent live or historical market results. Authentication, a complete financial ledger and general job administration are planned in the [delivery plan](roadmap.md).
