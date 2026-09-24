@@ -1,6 +1,7 @@
 .PHONY: test check up down smoke monitoring
 test:
 	go test -race ./...
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 check: test
 	go vet ./...
 	docker compose config --quiet

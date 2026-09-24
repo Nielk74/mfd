@@ -1,0 +1,20 @@
+[
+  {
+    "@id": "mfd-lab",
+    "match": [{"host": ["mfd.aklein.fr"]}],
+    "handle": [{"handler": "reverse_proxy", "upstreams": [{"dial": "192.168.1.56:8088"}]}],
+    "terminal": true
+  },
+  {
+    "@id": "mfd-grafana",
+    "match": [{"host": ["mfd-grafana.aklein.fr"]}],
+    "handle": [{"handler": "reverse_proxy", "upstreams": [{"dial": "192.168.1.56:3088"}]}],
+    "terminal": true
+  },
+  {
+    "@id": "mfd-prometheus",
+    "match": [{"host": ["mfd-prometheus.aklein.fr"]}],
+    "handle": [{"handler": "reverse_proxy", "upstreams": [{"dial": "192.168.1.56:9098"}]}],
+    "terminal": true
+  }
+]

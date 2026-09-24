@@ -23,7 +23,11 @@ make monitoring  # optional Prometheus :9098 and Grafana :3088
 make down        # stop services; retain data volumes
 ```
 
-Ports bind to localhost. Copy `.env.example` to `.env` to change host ports. Local database credentials in Compose are development defaults. The UI/API has no authentication yet; keep this deployment local. `docker compose down -v` deletes stored lab data.
+Ports bind to `0.0.0.0`, so the lab is reachable at `http://<host-address>:8088`. Copy `.env.example` to `.env` to change ports or set `MFD_BIND_ADDRESS=127.0.0.1`. Infrastructure ports are published too. The UI/API has no authentication yet and the database uses development credentials. `docker compose down -v` deletes stored lab data.
+
+The Mac deployment automatically checks `main` every minute and redeploys commits after CI passes. See [deployment and service addresses](docs/deployment.md) for setup, status, logs, backups and rollback behavior.
+
+Hosted interfaces: [lab](https://mfd.aklein.fr), [Grafana](https://mfd-grafana.aklein.fr), [Prometheus](https://mfd-prometheus.aklein.fr).
 
 ## Design
 

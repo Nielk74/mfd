@@ -64,7 +64,7 @@ func run() error {
 	}
 	defer wait()
 	defer stop()
-	server := &http.Server{Addr: env("MFD_ADDR", "127.0.0.1:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
+	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)
 	go func() {
 		slog.Info("lab ready", "address", server.Addr, "mode", "fixture", "workers", workers)

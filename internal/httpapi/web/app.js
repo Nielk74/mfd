@@ -167,7 +167,11 @@ function renderDecisions() {
 $("filter").onchange = renderDecisions;
 $("replay").onclick = async () => {
   $("replay").disabled = true;
-  pendingKey ??= crypto.randomUUID();
+  // randomUUID requires HTTPS (or localhost). getRandomValues also works on LAN HTTP.
+  pendingKey ??= Array.from(
+    crypto.getRandomValues(new Uint8Array(16)),
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
   try {
     const data = await request("/api/v1/replays", {
       method: "POST",

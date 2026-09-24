@@ -18,6 +18,7 @@ jobs:
           test -z "$(gofmt -l cmd internal)"
           go vet ./...
           go test -race ./...
+          python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Compose and pipeline
         run: |
           docker compose config --quiet

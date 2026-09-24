@@ -1,7 +1,11 @@
 name: mfd
 services:
   app:
-    build: .
+    image: ${MFD_IMAGE:-mfd-app:local}
+    build:
+      context: .
+      args:
+        MFD_REVISION: ${MFD_REVISION:-development}
     environment:
       MFD_ADDR: 0.0.0.0:8080
       MFD_MODE: fixture
@@ -10,7 +14,7 @@ services:
       REDIS_ADDR: redis:6379
       NATS_URL: nats://nats:4222
     ports:
-      - "127.0.0.1:${MFD_PORT:-8088}:8080"
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${MFD_PORT:-8088}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,6 +34,8 @@ services:
       retries: 5
   postgres:
     image: postgres:18.3-alpine
+    ports:
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: mfd
       POSTGRES_PASSWORD: mfd-local
@@ -44,6 +50,8 @@ services:
     restart: unless-stopped
   redis:
     image: redis:8.6.1-alpine
+    ports:
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${REDIS_PORT:-6379}:6379"
     command: [redis-server, --maxmemory, 64mb, --maxmemory-policy, allkeys-lru, --save, "", --appendonly, "no"]
     healthcheck:
       test: [CMD, redis-cli, ping]
@@ -53,6 +61,9 @@ services:
     restart: unless-stopped
   nats:
     image: nats:2.12.5-alpine
+    ports:
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${NATS_PORT:-4222}:4222"
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${NATS_MONITOR_PORT:-8222}:8222"
     command: [-js, -sd, /data, -m, "8222"]
     volumes:
       - nats-data:/data
@@ -65,17 +76,18 @@ services:
   prometheus:
     image: prom/prometheus:v3.5.0
     profiles: [monitoring]
-    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=15d]
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=15d, "--web.external-url=${PROMETHEUS_EXTERNAL_URL:-http://localhost:9098}"]
     volumes:
       - ./deploy/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
     ports:
-      - "127.0.0.1:${PROMETHEUS_PORT:-9098}:9090"
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${PROMETHEUS_PORT:-9098}:9090"
     restart: unless-stopped
   grafana:
     image: grafana/grafana:13.2.1
     profiles: [monitoring]
     environment:
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3088}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
@@ -85,7 +97,7 @@ services:
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
-      - "127.0.0.1:${GRAFANA_PORT:-3088}:3000"
+      - "${MFD_BIND_ADDRESS:-0.0.0.0}:${GRAFANA_PORT:-3088}:3000"
     restart: unless-stopped
 volumes:
   postgres-data:

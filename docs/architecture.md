@@ -36,7 +36,7 @@ flowchart LR
 
 PostgreSQL is authoritative. Redis can be emptied without losing decisions or money. NATS carries work and events; consumers acknowledge only after durable effects commit. Market history moves to compressed Parquet/object storage once measured retention justifies it; avoid adding another database now.
 
-The Compose baseline is one host, one replica per dependency, persistent volumes and localhost-only HTTP ports. It is a development topology, not high availability. PostgreSQL backups and tested restores precede live operation. No public deployment until authentication, TLS and secrets management exist.
+The Compose baseline is one host, one replica per dependency, persistent volumes and ports bound to all host interfaces. The requested Mac deployment includes automatic updates and Caddy HTTPS for the web interfaces; see [deployment](deployment.md). It is a development topology, not high availability. Authentication, secret management and tested restores remain prerequisites for live trading.
 
 ## Modules and contracts
 

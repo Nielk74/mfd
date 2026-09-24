@@ -18,6 +18,10 @@ import (
 
 //go:embed web/*
 var web embed.FS
+
+// Revision is set at build time so deployment checks identify the running binary.
+var Revision = "development"
+
 var keyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{8,100}$`)
 var idPattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
 
@@ -32,7 +36,7 @@ type Store interface {
 func New(p Store) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		write(w, 200, map[string]string{"status": "ok", "mode": "fixture"})
+		write(w, 200, map[string]string{"status": "ok", "mode": "fixture", "revision": Revision})
 	})
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)

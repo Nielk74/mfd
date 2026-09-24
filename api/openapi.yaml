@@ -2,8 +2,9 @@ openapi: 3.1.0
 info:
   title: mfd fixture lab
   version: 0.1.0
-  description: Local unauthenticated foundation. Only fixture replays are implemented; no broker or model execution.
+  description: Unauthenticated fixture foundation. Only fixture replays are implemented; no broker or model execution.
 servers:
+  - url: https://mfd.aklein.fr
   - url: http://localhost:8088
 paths:
   /api/v1/replays:
@@ -79,7 +80,7 @@ paths:
     get:
       operationId: liveness
       responses:
-        '200': {description: Process alive in fixture mode}
+        '200': {description: 'Process alive in fixture mode; includes the compiled revision'}
   /readyz:
     get:
       operationId: readiness
