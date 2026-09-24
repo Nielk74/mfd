@@ -1,0 +1,17 @@
+groups:
+  - name: mfd
+    rules:
+      - alert: MFDUnavailable
+        expr: up{job="mfd"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: mfd metrics endpoint is unavailable
+      - alert: MFDReplayStalled
+        expr: mfd_oldest_queued_seconds > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: A replay is queued for more than one minute

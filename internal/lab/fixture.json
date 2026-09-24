@@ -1,0 +1,13 @@
+{
+  "version": "fixture-v1",
+  "description": "Artificial USD spot holdings and quotes; no broker or model calls.",
+  "sleeves": [
+    {"id":"core","cash":"4000","strategy":"hold-v1","positions":[{"symbol":"AAPL","currency":"USD","units":"10","cost":"2000"}]},
+    {"id":"experiment","cash":"2000","strategy":"review-move-v1","positions":[{"symbol":"MSFT","currency":"USD","units":"5","cost":"2000"}]}
+  ],
+  "observations": [
+    {"at":"2026-09-21T14:00:00Z","quotes":[{"symbol":"AAPL","currency":"USD","bid":"199.90","ask":"200.10","at":"2026-09-21T14:00:00Z"},{"symbol":"MSFT","currency":"USD","bid":"399.90","ask":"400.10","at":"2026-09-21T14:00:00Z"}]},
+    {"at":"2026-09-21T14:01:00Z","quotes":[{"symbol":"AAPL","currency":"USD","bid":"200.90","ask":"201.10","at":"2026-09-21T14:01:00Z"},{"symbol":"MSFT","currency":"USD","bid":"397.90","ask":"398.10","at":"2026-09-21T14:01:00Z"}]},
+    {"at":"2026-09-21T14:02:00Z","quotes":[{"symbol":"AAPL","currency":"USD","bid":"197.90","ask":"198.10","at":"2026-09-21T14:02:00Z"},{"symbol":"MSFT","currency":"USD","bid":"404.90","ask":"405.10","at":"2026-09-21T14:02:00Z"}]}
+  ]
+}

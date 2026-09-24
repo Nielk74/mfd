@@ -1,0 +1,94 @@
+name: mfd
+services:
+  app:
+    build: .
+    environment:
+      MFD_ADDR: 0.0.0.0:8080
+      MFD_MODE: fixture
+      MFD_WORKERS: ${MFD_WORKERS:-2}
+      DATABASE_URL: postgres://mfd:mfd-local@postgres:5432/mfd?sslmode=disable
+      REDIS_ADDR: redis:6379
+      NATS_URL: nats://nats:4222
+    ports:
+      - "127.0.0.1:${MFD_PORT:-8088}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, mfd, healthcheck]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+  postgres:
+    image: postgres:18.3-alpine
+    environment:
+      POSTGRES_USER: mfd
+      POSTGRES_PASSWORD: mfd-local
+      POSTGRES_DB: mfd
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U mfd -d mfd"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  redis:
+    image: redis:8.6.1-alpine
+    command: [redis-server, --maxmemory, 64mb, --maxmemory-policy, allkeys-lru, --save, "", --appendonly, "no"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  nats:
+    image: nats:2.12.5-alpine
+    command: [-js, -sd, /data, -m, "8222"]
+    volumes:
+      - nats-data:/data
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: [monitoring]
+    command: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=15d]
+    volumes:
+      - ./deploy/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9098}:9090"
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.2.1
+    profiles: [monitoring]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3088}:3000"
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  nats-data:
+  prometheus-data:
+  grafana-data:

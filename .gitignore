@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+bin/
+coverage.out
+data/
+artifacts/
+node_modules/
+.DS_Store
+*.key
+*.pem
+credentials*

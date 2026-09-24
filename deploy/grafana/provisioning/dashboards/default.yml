@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: mfd
+    folder: mfd
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

@@ -1,0 +1,166 @@
+openapi: 3.1.0
+info:
+  title: mfd fixture lab
+  version: 0.1.0
+  description: Local unauthenticated foundation. Only fixture replays are implemented; no broker or model execution.
+servers:
+  - url: http://localhost:8088
+paths:
+  /api/v1/replays:
+    post:
+      operationId: createFixtureReplay
+      summary: Enqueue a durable fixture replay
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]{8,100}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '202':
+          description: Queued or previously accepted under the same key. Follow status_url for the current state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run_id, status_url]
+                properties:
+                  run_id: {type: string, format: uuid}
+                  status_url: {type: string}
+        '400': {description: Invalid key or request body}
+        '403': {description: Browser cross-origin write rejected}
+        '415': {description: Content-Type must be application/json}
+        '503': {description: Storage unavailable; retry with the same key}
+  /api/v1/runs:
+    get:
+      operationId: listRuns
+      summary: Latest 50 runs in descending creation order; result is null in summaries
+      responses:
+        '200':
+          description: Run summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs, limit]
+                properties:
+                  limit: {type: integer, const: 50}
+                  runs:
+                    type: array
+                    items: {$ref: '#/components/schemas/Run'}
+        '503': {description: Storage unavailable}
+  /api/v1/runs/{id}:
+    get:
+      operationId: getRun
+      summary: A run including captured snapshots and decisions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Run detail
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Run'}
+        '400': {description: Malformed ID}
+        '404': {description: Run not found}
+        '503': {description: Storage unavailable}
+  /healthz:
+    get:
+      operationId: liveness
+      responses:
+        '200': {description: Process alive in fixture mode}
+  /readyz:
+    get:
+      operationId: readiness
+      responses:
+        '200': {description: 'PostgreSQL, Redis and NATS available'}
+        '503': {description: At least one dependency unavailable; body gives individual booleans}
+  /metrics:
+    get:
+      operationId: metrics
+      responses:
+        '200': {description: Prometheus text exposition}
+        '503': {description: Database metrics unavailable}
+components:
+  schemas:
+    Decimal:
+      type: string
+      pattern: '^-?[0-9]+(\.[0-9]+)?$'
+      description: Exact decimal serialized as a string.
+    Position:
+      type: object
+      required: [symbol, currency, units, cost]
+      properties:
+        symbol: {type: string}
+        currency: {type: string, const: USD}
+        units: {$ref: '#/components/schemas/Decimal'}
+        cost: {$ref: '#/components/schemas/Decimal'}
+    Quote:
+      type: object
+      required: [symbol, currency, bid, ask, at]
+      properties:
+        symbol: {type: string}
+        currency: {type: string, const: USD}
+        bid: {$ref: '#/components/schemas/Decimal'}
+        ask: {$ref: '#/components/schemas/Decimal'}
+        at: {type: string, format: date-time}
+    Snapshot:
+      type: object
+      required: [sleeve, at, currency, cash, market_value, equity, liquidation_equity, unrealized_pnl, positions, quotes]
+      properties:
+        sleeve: {type: string}
+        at: {type: string, format: date-time}
+        currency: {type: string, const: USD}
+        cash: {$ref: '#/components/schemas/Decimal'}
+        market_value: {$ref: '#/components/schemas/Decimal'}
+        equity: {$ref: '#/components/schemas/Decimal'}
+        liquidation_equity: {$ref: '#/components/schemas/Decimal'}
+        unrealized_pnl: {$ref: '#/components/schemas/Decimal'}
+        positions: {type: array, items: {$ref: '#/components/schemas/Position'}}
+        quotes: {type: array, items: {$ref: '#/components/schemas/Quote'}}
+    Decision:
+      type: object
+      required: [id, sleeve, at, actor, strategy, action, reason, checks, snapshot_index]
+      properties:
+        id: {type: string, description: Unique within the containing run}
+        sleeve: {type: string}
+        at: {type: string, format: date-time}
+        actor: {type: string}
+        strategy: {type: string}
+        action: {type: string, enum: [hold, review]}
+        reason: {type: string}
+        checks: {type: array, items: {type: string}}
+        snapshot_index: {type: integer, minimum: 0}
+    Run:
+      type: object
+      required: [id, status, mode, actor, dataset_hash, created_at, finished_at, result, error]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [queued, completed, failed]}
+        mode: {type: string, const: fixture}
+        actor: {type: string, description: Local caller label; authenticated attribution is not implemented.}
+        dataset_hash: {type: string}
+        created_at: {type: string, format: date-time}
+        finished_at: {type: [string, 'null'], format: date-time}
+        error: {type: [string, 'null']}
+        result:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [dataset_hash, valuation_version, snapshots, decisions]
+              properties:
+                dataset_hash: {type: string}
+                valuation_version: {type: string}
+                snapshots: {type: array, items: {$ref: '#/components/schemas/Snapshot'}}
+                decisions: {type: array, items: {$ref: '#/components/schemas/Decision'}}

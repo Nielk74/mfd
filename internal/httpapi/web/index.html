@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>mfd · metro finance dodo</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to lab</a>
+    <header>
+      <a class="brand" href="/">mfd<span>metro finance dodo</span></a
+      ><span class="mode">Fixture lab</span
+      ><a href="https://github.com/Nielk74/mfd/tree/main/docs"
+        >Project docs ↗</a
+      >
+    </header>
+    <main id="main">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">PORTFOLIOS / DECISIONS / EVIDENCE</p>
+          <h1>Know what happened.</h1>
+          <p>
+            Inspect a portfolio, follow each decision, compare the evidence.
+          </p>
+        </div>
+        <button id="replay">
+          Run fixture replay <span aria-hidden="true">↗</span>
+        </button>
+      </section>
+      <div class="notice">
+        <strong>Artificial data. Fixed holdings.</strong> This build replays
+        three quote observations through two virtual sleeves. No broker, AI
+        model or order execution is connected.
+      </div>
+      <p id="status" role="status" aria-live="polite">Checking the lab…</p>
+      <div class="workspace">
+        <aside>
+          <div class="section-head">
+            <h2>Replays</h2>
+            <span id="run-count">0</span>
+          </div>
+          <p class="muted">Latest 50 · stored across restarts</p>
+          <div id="runs" class="run-list">
+            <p>No runs yet. Start a fixture replay.</p>
+          </div>
+        </aside>
+        <div class="detail">
+          <section class="run-heading">
+            <div>
+              <p class="eyebrow">SELECTED REPLAY</p>
+              <h2 id="run-title">Your lab starts here.</h2>
+              <p id="run-meta" class="muted">
+                Run the fixture to inspect its valuation and decision trail.
+              </p>
+            </div>
+            <a id="export" hidden>View JSON ↗</a>
+          </section>
+          <div id="result" hidden>
+            <div class="metrics">
+              <article>
+                <p>Final marked equity</p>
+                <strong id="equity">—</strong
+                ><small>USD · midpoint marks</small>
+              </article>
+              <article>
+                <p>Unrealized P&amp;L</p>
+                <strong id="pnl">—</strong
+                ><small>Against fixed holding cost</small>
+              </article>
+              <article>
+                <p>Recorded decisions</p>
+                <strong id="decisions-count">—</strong
+                ><small>Includes hold and review</small>
+              </article>
+            </div>
+            <section>
+              <div class="section-head">
+                <h2>Virtual sleeves</h2>
+                <span>Final observation</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <caption class="sr-only">
+                    Final portfolio valuations by sleeve
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>Sleeve</th>
+                      <th>Cash</th>
+                      <th>Equity</th>
+                      <th>Liquidation value</th>
+                      <th>Unrealized P&amp;L</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sleeves"></tbody>
+                </table>
+              </div>
+            </section>
+            <section>
+              <div class="section-head">
+                <h2>Valuation over time</h2>
+                <span>Fixture clock · UTC</span>
+              </div>
+              <p class="muted">
+                Fixed units and cash. These changes are marks, not a strategy
+                return.
+              </p>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Observation</th>
+                      <th>Combined equity</th>
+                      <th>Unrealized P&amp;L</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history"></tbody>
+                </table>
+              </div>
+            </section>
+            <section>
+              <div class="section-head">
+                <h2>Decision journal</h2>
+                <label
+                  >Sleeve
+                  <select id="filter">
+                    <option value="all">All</option>
+                    <option value="core">Core</option>
+                    <option value="experiment">Experiment</option>
+                  </select></label
+                >
+              </div>
+              <div id="decisions" class="journal"></div>
+            </section>
+            <details class="provenance">
+              <summary>Data and calculation versions</summary>
+              <dl>
+                <dt>Dataset SHA-256</dt>
+                <dd id="hash"></dd>
+                <dt>Valuation policy</dt>
+                <dd id="policy"></dd>
+                <dt>Execution</dt>
+                <dd>
+                  Unavailable in this build. Review decisions do not alter
+                  holdings.
+                </dd>
+              </dl>
+            </details>
+          </div>
+        </div>
+      </div>
+      <footer>
+        <span id="health">Dependencies: checking</span
+        ><span
+          >Every displayed value belongs to the selected fixture replay.</span
+        >
+      </footer>
+    </main>
+  </body>
+</html>

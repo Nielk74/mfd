@@ -1,0 +1,32 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Go checks
+        run: |
+          test -z "$(gofmt -l cmd internal)"
+          go vet ./...
+          go test -race ./...
+      - name: Compose and pipeline
+        run: |
+          docker compose config --quiet
+          docker compose up -d --build --wait --wait-timeout 180
+          python3 scripts/smoke.py
+          python3 scripts/recovery.py
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 100
+      - name: Stop test stack
+        if: always()
+        run: docker compose down -v
