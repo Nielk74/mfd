@@ -10,7 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestDemoOrderUsesOnlyDemoEndpointAndExactNumericBoundary(t *testing.T) {
+func TestDemoMarketOrderUsesOnlyDemoEndpointAndExactNumericBoundary(t *testing.T) {
 	requestID := "11111111-2222-4333-8444-555555555555"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost || r.URL.Path != DemoOrderPath || r.Header.Get("x-request-id") != requestID {
@@ -20,14 +20,14 @@ func TestDemoOrderUsesOnlyDemoEndpointAndExactNumericBoundary(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatal(err)
 		}
-		if string(body["amount"]) != "100" || string(body["limitRate"]) != "80160.02" || string(body["settlementType"]) != `"real"` || string(body["orderType"]) != `"limitIOC"` || string(body["leverage"]) != "1" {
+		if string(body["amount"]) != "100" || string(body["settlementType"]) != `"real"` || string(body["orderType"]) != `"mkt"` || string(body["leverage"]) != "1" || body["limitRate"] != nil || body["triggerRate"] != nil {
 			t.Errorf("unsafe numeric/order boundary: %v", body)
 		}
 		_, _ = w.Write([]byte(`{"orderId":42,"referenceId":"11111111-2222-4333-8444-555555555555"}`))
 	}))
 	defer server.Close()
 	client := &Client{BaseURL: server.URL, APIKey: "synthetic-app", UserKey: "synthetic-demo", HTTP: server.Client()}
-	_, status, receipt, err := client.SubmitDemoLimitIOC(context.Background(), requestID, 100000, decimal.NewFromInt(100), decimal.RequireFromString("80160.02"))
+	_, status, receipt, err := client.SubmitDemoMarket(context.Background(), requestID, 100000, decimal.NewFromInt(100))
 	if err != nil || status != 200 || receipt.OrderID != 42 {
 		t.Fatalf("receipt %+v, status %d, err %v", receipt, status, err)
 	}

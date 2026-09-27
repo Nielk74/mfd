@@ -45,7 +45,7 @@ Use Kafka when measured throughput, retention or integrations justify it. Start 
 - [Research: eToro, Jev, QuantDinger and related engines](docs/research/2026-09-25-foundations.md)
 - [Architecture and data flow](docs/architecture.md)
 - [Portfolio accounting, decisions and strategy evaluation](docs/portfolio-and-decisions.md)
-- [Demo BTC liquidity probe](docs/demo-btc-probe.md)
+- [Demo BTC market entry probe](docs/demo-btc-probe.md)
 - [Infrastructure decision](docs/adr/0001-small-durable-core.md)
 - [Monitoring and recovery plan](docs/observability.md)
 - [Milestones and acceptance gates](docs/roadmap.md)

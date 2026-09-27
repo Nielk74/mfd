@@ -297,13 +297,12 @@ func (c *Client) FetchDemoEligibility(ctx context.Context, instrumentID int64) (
 	return raw, out, nil
 }
 
-func demoOrderBody(instrumentID int64, amount, limitRate decimal.Decimal) map[string]any {
-	return map[string]any{"action": "open", "transaction": "buy", "instrumentId": instrumentID, "settlementType": "real", "orderType": "limitIOC", "leverage": 1, "amount": json.Number(amount.String()), "orderCurrency": "usd", "limitRate": json.Number(limitRate.String())}
+func demoMarketOrderBody(instrumentID int64, amount decimal.Decimal) map[string]any {
+	return map[string]any{"action": "open", "transaction": "buy", "instrumentId": instrumentID, "settlementType": "real", "orderType": "mkt", "leverage": 1, "amount": json.Number(amount.String()), "orderCurrency": "usd"}
 }
 
 func (c *Client) FetchDemoCosts(ctx context.Context, instrumentID int64, amount decimal.Decimal) ([]byte, TradingCosts, error) {
-	body := map[string]any{"action": "open", "transaction": "buy", "instrumentId": instrumentID, "settlementType": "real", "orderType": "limitIOC", "leverage": 1, "amount": json.Number(amount.String()), "orderCurrency": "usd"}
-	raw, _, err := c.request(ctx, http.MethodPost, DemoCostsPath, "", body)
+	raw, _, err := c.request(ctx, http.MethodPost, DemoCostsPath, "", demoMarketOrderBody(instrumentID, amount))
 	if err != nil {
 		return raw, TradingCosts{}, err
 	}
@@ -333,8 +332,8 @@ func (c *Client) FetchDemoCosts(ctx context.Context, instrumentID int64, amount 
 	return raw, out, nil
 }
 
-func (c *Client) SubmitDemoLimitIOC(ctx context.Context, requestID string, instrumentID int64, amount, limitRate decimal.Decimal) ([]byte, int, OrderReceipt, error) {
-	raw, status, err := c.request(ctx, http.MethodPost, DemoOrderPath, requestID, demoOrderBody(instrumentID, amount, limitRate))
+func (c *Client) SubmitDemoMarket(ctx context.Context, requestID string, instrumentID int64, amount decimal.Decimal) ([]byte, int, OrderReceipt, error) {
+	raw, status, err := c.request(ctx, http.MethodPost, DemoOrderPath, requestID, demoMarketOrderBody(instrumentID, amount))
 	if err != nil {
 		return raw, status, OrderReceipt{}, err
 	}

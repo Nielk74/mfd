@@ -21,13 +21,13 @@ import (
 // This is a deliberately narrow Demo strategy: one $100 unlevered BTC buy,
 // only when the observed account is empty and live provider checks pass. It is
 // a connectivity and decision-trail experiment, not a performance claim.
-const DemoProbeVersion = "btc-liquidity-probe-v1"
+const DemoProbeVersion = "btc-market-entry-probe-v2"
 
 var demoAmount = decimal.NewFromInt(100)
 var demoMinimumCash = decimal.NewFromInt(500)
 var demoCostCap = decimal.NewFromInt(2)
 var demoSpreadCapBps = decimal.NewFromInt(50)
-var demoLimitMultiplier = decimal.RequireFromString("1.002")
+var demoRecheckAskMultiplier = decimal.RequireFromString("1.002")
 
 var ErrDemoIntentNotReady = errors.New("demo decision is not ready or has expired")
 var ErrDemoActiveIntent = errors.New("another demo order is still unresolved")
@@ -47,7 +47,8 @@ type DemoPlan struct {
 	Leverage                int               `json:"leverage"`
 	Bid                     decimal.Decimal   `json:"bid"`
 	Ask                     decimal.Decimal   `json:"ask"`
-	LimitRate               decimal.Decimal   `json:"limit_rate"`
+	LimitRate               *decimal.Decimal  `json:"limit_rate,omitempty"`
+	MaxRecheckAsk           *decimal.Decimal  `json:"max_recheck_ask,omitempty"`
 	SpreadBps               decimal.Decimal   `json:"spread_bps"`
 	QuoteAt                 time.Time         `json:"quote_at"`
 	QuoteTimeAssumedUTC     bool              `json:"quote_time_assumed_utc"`
@@ -219,13 +220,13 @@ func (b *BrokerService) evaluateDemo(ctx context.Context) demoEvaluation {
 	if !v.check("cost_cap", immediate.LessThanOrEqual(demoCostCap), "Estimated upfront costs must not exceed $2 (2% of the order).") {
 		return v
 	}
-	limit := quote.Ask.Mul(demoLimitMultiplier).RoundUp(2)
+	maxRecheckAsk := quote.Ask.Mul(demoRecheckAskMultiplier).RoundUp(2)
 	digests := map[string]string{}
 	for _, artifact := range v.Artifacts {
 		digests[artifact.Source] = etoro.Digest(artifact.Raw)
 	}
-	v.Plan = &DemoPlan{Symbol: "BTC", AccountFingerprint: accountFingerprint, InstrumentID: instrument.ID, AmountUSD: demoAmount, OrderType: "limitIOC", SettlementType: "real", Leverage: 1, Bid: quote.Bid, Ask: quote.Ask, LimitRate: limit, SpreadBps: spread.Round(4), QuoteAt: quote.At, QuoteTimeAssumedUTC: quote.TimeAssumedUTC, EstimatedUpfrontCostUSD: immediate, SourceSHA256: digests}
-	v.Reason = "All Demo account, market, eligibility, and cost checks passed. The price-limited order is ready for operator submission."
+	v.Plan = &DemoPlan{Symbol: "BTC", AccountFingerprint: accountFingerprint, InstrumentID: instrument.ID, AmountUSD: demoAmount, OrderType: "mkt", SettlementType: "real", Leverage: 1, Bid: quote.Bid, Ask: quote.Ask, MaxRecheckAsk: &maxRecheckAsk, SpreadBps: spread.Round(4), QuoteAt: quote.At, QuoteTimeAssumedUTC: quote.TimeAssumedUTC, EstimatedUpfrontCostUSD: immediate, SourceSHA256: digests}
+	v.Reason = "All Demo account, market, eligibility, and market-order cost checks passed. The $100 market order is ready for operator submission; its execution price may differ from the quote."
 	return v
 }
 
@@ -243,6 +244,9 @@ func scanDemoRun(row pgx.Row) (DemoStrategyRun, error) {
 	}
 	if err = json.Unmarshal(checksRaw, &out.Checks); err != nil {
 		return out, err
+	}
+	if out.BrokerPositionIDs == nil {
+		out.BrokerPositionIDs = []int64{}
 	}
 	out.Events = []DemoEvent{}
 	return out, nil
@@ -407,7 +411,7 @@ func (b *BrokerService) DemoExecute(ctx context.Context, id string) (DemoStrateg
 	if err != nil {
 		return run, err
 	}
-	if run.Status != "ready" || run.ExpiresAt == nil || time.Now().After(*run.ExpiresAt) || run.Plan == nil {
+	if run.Status != "ready" || run.StrategyVersion != DemoProbeVersion || run.ExpiresAt == nil || time.Now().After(*run.ExpiresAt) || run.Plan == nil || run.Plan.OrderType != "mkt" || run.Plan.MaxRecheckAsk == nil || !run.Plan.MaxRecheckAsk.IsPositive() {
 		return run, ErrDemoIntentNotReady
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -416,8 +420,8 @@ func (b *BrokerService) DemoExecute(ctx context.Context, id string) (DemoStrateg
 	if evaluation.Plan == nil {
 		return b.holdDemo(ctx, id, evaluation.Reason, evaluation)
 	}
-	if evaluation.Plan.AccountFingerprint != run.Plan.AccountFingerprint || evaluation.Plan.InstrumentID != run.Plan.InstrumentID || evaluation.Plan.Ask.GreaterThan(run.Plan.LimitRate) {
-		return b.holdDemo(ctx, id, "The provider account, instrument mapping or quote changed beyond the reviewed plan. Preview a new decision.", evaluation)
+	if evaluation.Plan.AccountFingerprint != run.Plan.AccountFingerprint || evaluation.Plan.InstrumentID != run.Plan.InstrumentID || evaluation.Plan.Ask.GreaterThan(*run.Plan.MaxRecheckAsk) {
+		return b.holdDemo(ctx, id, "The provider account, instrument mapping or ask changed beyond the reviewed recheck ceiling. Preview a new decision.", evaluation)
 	}
 	// Persist the intent and its source evidence before calling the broker. The
 	// unique active index serializes unresolved submissions across requests.
@@ -426,7 +430,7 @@ func (b *BrokerService) DemoExecute(ctx context.Context, id string) (DemoStrateg
 		return DemoStrategyRun{}, err
 	}
 	defer tx.Rollback(ctx)
-	tag, err := tx.Exec(ctx, `UPDATE demo_strategy_runs SET status='submitting',reason='A single Demo limitIOC order is being submitted.',request_id=$1,updated_at=now() WHERE id=$1 AND status='ready' AND expires_at>now()`, id)
+	tag, err := tx.Exec(ctx, `UPDATE demo_strategy_runs SET status='submitting',reason='A single $100 Demo BTC market order is being submitted.',request_id=$1,updated_at=now() WHERE id=$1 AND status='ready' AND expires_at>now()`, id)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -440,7 +444,7 @@ func (b *BrokerService) DemoExecute(ctx context.Context, id string) (DemoStrateg
 	if err = b.saveArtifacts(ctx, tx, id, "recheck", evaluation.Artifacts); err != nil {
 		return DemoStrategyRun{}, err
 	}
-	if err = addDemoEvent(ctx, tx, id, "submit_intent", "The operator submitted the reviewed $100 Demo BTC limitIOC plan. Broker request ID equals the decision ID.", 0); err != nil {
+	if err = addDemoEvent(ctx, tx, id, "submit_intent", "The operator submitted the reviewed $100 Demo BTC market plan. Broker request ID equals the decision ID.", 0); err != nil {
 		return DemoStrategyRun{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -449,7 +453,7 @@ func (b *BrokerService) DemoExecute(ctx context.Context, id string) (DemoStrateg
 	// Do not abandon persistence if the HTTP caller disconnects after eToro has
 	// accepted the request. An ambiguous outcome remains frozen for lookup.
 	submitCtx, submitCancel := context.WithTimeout(context.Background(), 25*time.Second)
-	raw, httpStatus, receipt, submitErr := evaluation.Client.SubmitDemoLimitIOC(submitCtx, id, run.Plan.InstrumentID, run.Plan.AmountUSD, run.Plan.LimitRate)
+	raw, httpStatus, receipt, submitErr := evaluation.Client.SubmitDemoMarket(submitCtx, id, run.Plan.InstrumentID, run.Plan.AmountUSD)
 	submitCancel()
 	persistCtx, persistCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	state, reason, event := "unknown", "Broker submission outcome is uncertain; reconcile by request ID before any further order.", "submission_unknown"

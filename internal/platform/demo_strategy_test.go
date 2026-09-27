@@ -41,6 +41,13 @@ func syntheticDemoServer(t *testing.T, cash, bid, ask string, pending bool) *htt
 		case etoro.DemoEligibilityPath:
 			_, _ = w.Write([]byte(`{"currency":"usd","eligibilities":[{"instrumentId":100000,"symbol":"BTC","allowOpenPosition":true,"minPositionExposure":50,"leverageConfigs":[{"settlementType":"real","direction":"long","leverageValues":[1],"isPotential":false,"minPositionAmount":50}]}]}`))
 		case etoro.DemoCostsPath:
+			var request map[string]json.RawMessage
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Errorf("decode cost request: %v", err)
+			}
+			if string(request["orderType"]) != `"mkt"` || string(request["amount"]) != "100" || request["limitRate"] != nil {
+				t.Errorf("cost estimate does not match the market submission: %v", request)
+			}
 			fmt.Fprintf(w, `{"instrumentId":100000,"lastUpdated":%q,"costs":[{"costType":"marketSpread","currency":"USD","value":1},{"costType":"overnightFee","currency":"USD","value":0}]}`, costTime)
 		default:
 			t.Errorf("unexpected provider path %s", r.URL.Path)
@@ -71,7 +78,7 @@ func TestDemoPreflightRequiresAccountAndMarketChecks(t *testing.T) {
 				t.Fatalf("plan ready=%t, reason=%s", result.Plan != nil, result.Reason)
 			}
 			if tc.wantReady {
-				if result.Plan.OrderType != "limitIOC" || result.Plan.Leverage != 1 || !result.Plan.AmountUSD.Equal(demoAmount) || !result.Plan.LimitRate.GreaterThan(result.Plan.Ask) {
+				if result.Plan.OrderType != "mkt" || result.Plan.Leverage != 1 || !result.Plan.AmountUSD.Equal(demoAmount) || result.Plan.LimitRate != nil || result.Plan.MaxRecheckAsk == nil || !result.Plan.MaxRecheckAsk.GreaterThan(result.Plan.Ask) {
 					t.Fatalf("unsafe order plan: %+v", result.Plan)
 				}
 				payload, err := json.Marshal(result.Plan)

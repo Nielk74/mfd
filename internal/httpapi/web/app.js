@@ -518,7 +518,10 @@ function renderDemoDecision() {
   addFact('Created', time(run.created_at));
   if (run.plan) {
     addFact('Order plan', `${run.plan.symbol} · ${money(run.plan.amount_usd)} · ${run.plan.settlement_type} · ${run.plan.leverage}×`);
-    addFact('Price limit', `${run.plan.limit_rate} USD · ${run.plan.order_type}`);
+    if (run.plan.order_type === 'mkt') {
+      addFact('Order type', 'Market · $100 amount · no broker price limit');
+      if (run.plan.max_recheck_ask) addFact('Recheck ask ceiling', `${run.plan.max_recheck_ask} USD · before submission only`);
+    } else if (run.plan.limit_rate) addFact('Price limit', `${run.plan.limit_rate} USD · ${run.plan.order_type}`);
     addFact('Observed quote', `bid ${run.plan.bid} / ask ${run.plan.ask} · ${run.plan.spread_bps} bps`);
     addFact('Quote time', `${time(run.plan.quote_at)}${run.plan.quote_time_assumed_utc ? ' · source UTC assumed' : ''}`);
     addFact('Estimated upfront cost', money(run.plan.estimated_upfront_cost_usd));
