@@ -403,6 +403,11 @@ async function refreshBrokerStatus() {
     $('broker-snapshots').textContent = status.snapshot_count;
     $('broker-sync').disabled = !operatorToken || !status.configured;
     if (!status.configured) $('broker-message').textContent = `No ${label} key is confirmed. Add an eToro ${label} + Read user key to private settings.`;
+    else if (status.last_result === 'ok') $('broker-message').textContent = operatorToken
+      ? `Private ${label} account view unlocked for this tab.`
+      : `${label} account read connected. Enter the operator token to inspect its history.`;
+    else if (status.last_result === 'schema_error') $('broker-message').textContent = `eToro returned ${label} account data that the importer could not validate. No snapshot was saved.`;
+    else if (status.last_result === 'unauthorized') $('broker-message').textContent = `eToro rejected the ${label} key. Check whether it was revoked or expired.`;
     else if (status.last_result === 'permission_denied') $('broker-message').textContent = `eToro denied ${label} portfolio access. Check this key's environment and Read permission.`;
     else if (status.last_result === 'credential_conflict') $('broker-message').textContent = `Two keys resolved to ${label}. Remove the extra key from private settings; its account was not imported.`;
   } catch (error) { $('broker-badge').textContent = 'UNAVAILABLE'; $('broker-message').textContent = `Could not read broker status: ${error.message}`; }
@@ -422,7 +427,8 @@ async function loadBrokerHistory() {
   const body = node('tbody');
   for (const item of data.snapshots) {
     const row = node('tr'); const portfolio = item.portfolio;
-    for (const value of [time(item.fetched_at), time(portfolio.provider_at), money(portfolio.total_value), money(portfolio.available_cash), money(portfolio.current_pnl), portfolio.instruments.length, portfolio.mirror_count]) row.append(node('td', value));
+    const providerTime = `${time(portfolio.provider_at)}${portfolio.provider_time_assumed_utc ? ' · source UTC assumed' : ''}`;
+    for (const value of [time(item.fetched_at), providerTime, money(portfolio.total_value), money(portfolio.available_cash), money(portfolio.current_pnl), portfolio.instruments.length, portfolio.mirror_count]) row.append(node('td', value));
     body.append(row);
   }
   table.append(body); container.append(table);

@@ -203,9 +203,10 @@ components:
         source_sha256: {type: string, description: Hash of the encrypted source payload}
         portfolio:
           type: object
-          required: [provider_at, currency, available_cash, total_value, current_pnl, instruments, mirror_count]
+          required: [provider_at, provider_time_assumed_utc, currency, available_cash, total_value, current_pnl, instruments, mirror_count]
           properties:
             provider_at: {type: string, format: date-time}
+            provider_time_assumed_utc: {type: boolean, description: True when eToro omitted the timezone offset and the importer interpreted its timestamp as UTC}
             currency: {type: string, const: USD}
             available_cash: {$ref: '#/components/schemas/Decimal'}
             total_value: {$ref: '#/components/schemas/Decimal'}

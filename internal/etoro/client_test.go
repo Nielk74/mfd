@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 const aggregateFixture = `{"timestamp":"2026-05-26T15:24:25.267Z","accountCurrency":"USD","accountTotals":{"accountAvailableCash":4320.84,"accountTotalValue":5154.48,"accountCurrentPnl":-300.35},"instrumentAggregates":[{"instrumentId":100000,"assetCurrency":"USD","netUnits":0.008076,"netCurrentExposureAccountCurrency":624.57,"pnlAssetCurrency":-225.3,"liquidationValueAccountCurrency":624.56,"avgLeverage":1}],"mirrors":[{}]}`
@@ -32,6 +33,9 @@ func TestAggregateReadUsesOfficialHeadersAndExactNumbers(t *testing.T) {
 			if s.Currency != "USD" || s.TotalValue.String() != "5154.48" || s.CurrentPnL.String() != "-300.35" || s.MirrorCount != 1 {
 				t.Fatalf("wrong totals: %+v", s)
 			}
+			if s.ProviderTimeAssumedUTC {
+				t.Fatal("timestamp with an explicit offset was marked assumed")
+			}
 			if len(s.Instruments) != 1 || s.Instruments[0].NetUnits.String() != "0.008076" {
 				t.Fatalf("wrong exact position: %+v", s.Instruments)
 			}
@@ -41,8 +45,25 @@ func TestAggregateReadUsesOfficialHeadersAndExactNumbers(t *testing.T) {
 		})
 	}
 }
+
+func TestAggregateAcceptsOffsetlessDemoTimeWithVisibleAssumption(t *testing.T) {
+	raw := strings.Replace(aggregateFixture, `"2026-05-26T15:24:25.267Z"`, `"2026-05-26T15:24:25.267"`, 1)
+	raw = strings.Replace(raw, `"instrumentAggregates":[{"instrumentId":100000,"assetCurrency":"USD","netUnits":0.008076,"netCurrentExposureAccountCurrency":624.57,"pnlAssetCurrency":-225.3,"liquidationValueAccountCurrency":624.56,"avgLeverage":1}]`, `"instrumentAggregates":[]`, 1)
+	raw = strings.Replace(raw, `"mirrors":[{}]`, `"mirrors":[]`, 1)
+	s, err := ParseAggregate([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.ProviderTimeAssumedUTC || !s.ProviderAt.Equal(time.Date(2026, 5, 26, 15, 24, 25, 267000000, time.UTC)) {
+		t.Fatalf("offsetless provider time not normalized as UTC: %+v", s)
+	}
+	if s.AvailableCash.String() != "4320.84" || len(s.Instruments) != 0 || s.MirrorCount != 0 {
+		t.Fatalf("empty demo account shape not preserved: %+v", s)
+	}
+}
 func TestAggregateRejectsMissingFinancialFields(t *testing.T) {
 	for _, raw := range []string{
+		strings.Replace(aggregateFixture, `"2026-05-26T15:24:25.267Z"`, `"2026-05-26T15:24:25.267+00"`, 1),
 		strings.Replace(aggregateFixture, `"accountTotalValue":5154.48`, `"accountTotalValue":null`, 1),
 		strings.Replace(aggregateFixture, `"netUnits":0.008076`, `"netUnits":null`, 1),
 		strings.Replace(aggregateFixture, `"assetCurrency":"USD"`, `"assetCurrency":""`, 1),

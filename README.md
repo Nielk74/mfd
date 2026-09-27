@@ -2,7 +2,7 @@
 
 **metro finance dodo** — a Go lab for portfolios, strategies and traceable trading decisions.
 
-See what you own, what a strategy decided, and what actually happened. Humans and agents will use the same recorded operations. eToro is the only planned portfolio/execution provider. Its official Demo and Real portfolio read adapters are wired; the active key has confirmed Real read access, while Demo still needs a Demo-scoped key.
+See what you own, what a strategy decided, and what actually happened. Humans and agents will use the same recorded operations. eToro is the only planned portfolio/execution provider. Its official Demo and Real portfolio read adapters are wired; a Demo-scoped key now imports account snapshots. The previously active Real key was revoked and currently returns 401.
 
 ## Start
 
@@ -63,4 +63,4 @@ Follow the returned `status_url`. Reusing the same key and experiment returns th
 
 ## eToro connectivity check
 
-Set `ETORO_API_KEY` with either or both `ETORO_DEMO_USER_KEY` and `ETORO_REAL_USER_KEY` in a private environment. `python3 scripts/etoro_probe.py` checks the official Demo and Real aggregate endpoints and prints only status and shape; it exits nonzero if a key resolves to the wrong slot. A successful, schema-valid read confirms the key's environment; if misplaced, the importer switches endpoints and labels the account accordingly. Both user keys supplied so far resolve to Real, for different provider accounts. One remains inactive in private settings to avoid mixing account histories; a Demo + Read key is still needed for Demo snapshots. Successful raw responses are encrypted before PostgreSQL stores them. The eToro tab unlocks each account history with a separate operator token held only in tab memory. No account amounts enter Prometheus. Do not commit keys or broker responses. See [verification](docs/verification.md) for results.
+Set `ETORO_API_KEY` with either or both `ETORO_DEMO_USER_KEY` and `ETORO_REAL_USER_KEY` in a private environment. `python3 scripts/etoro_probe.py` checks the official Demo and Real aggregate endpoints and prints only status and top-level shape; it exits nonzero if a key resolves to the wrong slot. The importer validates the full account shape before binding a key to an environment and can relabel a misplaced key. A confirmed Demo key now produces encrypted snapshots. eToro's Demo timestamp omitted a timezone offset, so the importer interprets it as UTC and flags that assumption in the account API and lab. The configured Real key was revoked; its current reads return 401 until replaced. The eToro tab unlocks each account history with a separate operator token held only in tab memory. No account amounts enter Prometheus. Do not commit keys or broker responses. See [verification](docs/verification.md) for results.

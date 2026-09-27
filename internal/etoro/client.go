@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,6 +24,8 @@ const OfficialBase = "https://public-api.etoro.com"
 const DemoAggregatePath = "/api/v1/trading/info/demo/aggregate-portfolio"
 const RealAggregatePath = "/api/v1/trading/info/aggregate-portfolio"
 const maxBody = 2 << 20
+
+var offsetlessProviderTimestamp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$`)
 
 type Client struct {
 	BaseURL string
@@ -56,13 +59,14 @@ type Instrument struct {
 	AverageLeverage decimal.Decimal `json:"average_leverage"`
 }
 type Snapshot struct {
-	ProviderAt    time.Time       `json:"provider_at"`
-	Currency      string          `json:"currency"`
-	AvailableCash decimal.Decimal `json:"available_cash"`
-	TotalValue    decimal.Decimal `json:"total_value"`
-	CurrentPnL    decimal.Decimal `json:"current_pnl"`
-	Instruments   []Instrument    `json:"instruments"`
-	MirrorCount   int             `json:"mirror_count"`
+	ProviderAt             time.Time       `json:"provider_at"`
+	ProviderTimeAssumedUTC bool            `json:"provider_time_assumed_utc"`
+	Currency               string          `json:"currency"`
+	AvailableCash          decimal.Decimal `json:"available_cash"`
+	TotalValue             decimal.Decimal `json:"total_value"`
+	CurrentPnL             decimal.Decimal `json:"current_pnl"`
+	Instruments            []Instrument    `json:"instruments"`
+	MirrorCount            int             `json:"mirror_count"`
 }
 
 func AggregatePath(environment string) (string, error) {
@@ -145,7 +149,7 @@ func (c *Client) FetchAggregate(ctx context.Context, environment string) ([]byte
 
 func ParseAggregate(raw []byte) (Snapshot, error) {
 	var envelope struct {
-		Timestamp            time.Time                  `json:"timestamp"`
+		Timestamp            string                     `json:"timestamp"`
 		AccountCurrency      string                     `json:"accountCurrency"`
 		AccountTotals        map[string]json.RawMessage `json:"accountTotals"`
 		InstrumentAggregates []json.RawMessage          `json:"instrumentAggregates"`
@@ -160,7 +164,8 @@ func ParseAggregate(raw []byte) (Snapshot, error) {
 	if decoder.Decode(&trailing) != io.EOF {
 		return Snapshot{}, errors.New("unexpected trailing aggregate data")
 	}
-	if envelope.Timestamp.IsZero() || envelope.AccountCurrency != "USD" || envelope.AccountTotals == nil || envelope.InstrumentAggregates == nil || envelope.Mirrors == nil {
+	providerAt, assumedUTC, err := parseProviderTimestamp(envelope.Timestamp)
+	if err != nil || envelope.AccountCurrency != "USD" || envelope.AccountTotals == nil || envelope.InstrumentAggregates == nil || envelope.Mirrors == nil {
 		return Snapshot{}, errors.New("missing timestamp, USD currency, account totals or position arrays")
 	}
 	requiredDecimal := func(name string) (decimal.Decimal, error) {
@@ -175,10 +180,10 @@ func ParseAggregate(raw []byte) (Snapshot, error) {
 		return d, nil
 	}
 	var s Snapshot
-	s.ProviderAt = envelope.Timestamp.UTC()
+	s.ProviderAt = providerAt
+	s.ProviderTimeAssumedUTC = assumedUTC
 	s.Currency = "USD"
 	s.MirrorCount = len(envelope.Mirrors)
-	var err error
 	if s.AvailableCash, err = requiredDecimal("accountAvailableCash"); err != nil {
 		return Snapshot{}, err
 	}
@@ -218,5 +223,21 @@ func ParseAggregate(raw []byte) (Snapshot, error) {
 		s.Instruments = append(s.Instruments, Instrument{InstrumentID: provider.InstrumentID, AssetCurrency: provider.AssetCurrency, NetUnits: provider.NetUnits, ExposureUSD: provider.ExposureUSD, PnL: provider.PnL, LiquidationUSD: provider.LiquidationUSD, AverageLeverage: provider.AverageLeverage})
 	}
 	return s, nil
+}
+
+func parseProviderTimestamp(value string) (time.Time, bool, error) {
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil && !parsed.IsZero() {
+		return parsed.UTC(), false, nil
+	}
+	// eToro's Demo aggregate can omit the offset. Keep that inference visible in
+	// the parsed snapshot; the encrypted raw response retains the original text.
+	if !offsetlessProviderTimestamp.MatchString(value) {
+		return time.Time{}, false, errors.New("invalid provider timestamp")
+	}
+	parsed, err := time.Parse("2006-01-02T15:04:05", value)
+	if err != nil || parsed.IsZero() {
+		return time.Time{}, false, errors.New("invalid provider timestamp")
+	}
+	return parsed.UTC(), true, nil
 }
 func Digest(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
