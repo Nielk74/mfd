@@ -32,10 +32,10 @@ type Store interface {
 	Runs(context.Context) ([]platform.Run, error)
 	Run(context.Context, string) (platform.Run, error)
 	Operations(context.Context) (platform.Operations, error)
-	BrokerStatus(context.Context) (platform.BrokerStatus, error)
+	BrokerStatus(context.Context) (platform.BrokerOverview, error)
 	BrokerAuthorized(string) bool
-	BrokerHistory(context.Context) ([]platform.BrokerSnapshot, error)
-	BrokerSync(context.Context) (platform.BrokerStatus, error)
+	BrokerHistory(context.Context, string) ([]platform.BrokerSnapshot, error)
+	BrokerSync(context.Context, string) (platform.BrokerStatus, error)
 	Ready(context.Context) map[string]bool
 	Metrics(context.Context) (string, error)
 }
@@ -99,22 +99,41 @@ func New(p Store) http.Handler {
 		}
 		return true
 	}
+	brokerEnvironment := func(w http.ResponseWriter, r *http.Request) string {
+		environment := r.URL.Query().Get("environment")
+		if environment == "" {
+			environment = "demo"
+		} // legacy clients
+		if environment != "demo" && environment != "real" {
+			write(w, 400, map[string]string{"error": "invalid_environment"})
+			return ""
+		}
+		return environment
+	}
 	mux.HandleFunc("GET /api/v1/etoro/snapshots", func(w http.ResponseWriter, r *http.Request) {
 		if !operator(w, r) {
 			return
 		}
-		items, err := p.BrokerHistory(r.Context())
+		environment := brokerEnvironment(w, r)
+		if environment == "" {
+			return
+		}
+		items, err := p.BrokerHistory(r.Context(), environment)
 		if err != nil {
 			failure(w, err)
 			return
 		}
-		write(w, 200, map[string]any{"snapshots": items, "limit": 30})
+		write(w, 200, map[string]any{"environment": environment, "snapshots": items, "limit": 30})
 	})
 	mux.HandleFunc("POST /api/v1/etoro/sync", func(w http.ResponseWriter, r *http.Request) {
 		if !operator(w, r) {
 			return
 		}
-		status, err := p.BrokerSync(r.Context())
+		environment := brokerEnvironment(w, r)
+		if environment == "" {
+			return
+		}
+		status, err := p.BrokerSync(r.Context(), environment)
 		if err != nil {
 			failure(w, err)
 			return
@@ -194,7 +213,7 @@ func New(p Store) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		timeout := 10 * time.Second
 		if r.URL.Path == "/api/v1/etoro/sync" {
-			timeout = 35 * time.Second
+			timeout = 55 * time.Second
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()

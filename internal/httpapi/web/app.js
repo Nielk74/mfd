@@ -19,6 +19,7 @@ const randomKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (
 let runs = [], selected = null, current = null, comparison = null, pendingKey = null, busy = false;
 let activeView = 'workspace', renderedList = '', lastOperations = null;
 let operatorToken = '';
+let selectedBrokerEnvironment = 'demo', brokerStatuses = null, brokerSelectionTouched = false;
 
 async function request(url, options) {
   const response = await fetch(url, options);
@@ -365,25 +366,56 @@ $('refresh-ops').onclick = refreshOperations;
 
 async function refreshBrokerStatus() {
   try {
-    const status = await request('/api/v1/etoro/status');
-    const result = status.configured ? status.last_result.replaceAll('_', ' ') : 'Not configured';
-    $('broker-badge').textContent = status.configured ? status.last_result.toUpperCase().replaceAll('_', ' ') : 'NOT CONFIGURED';
-    $('broker-result').textContent = result;
+    const overview = await request('/api/v1/etoro/status');
+    brokerStatuses = overview.environments;
+    const previousEnvironment = selectedBrokerEnvironment;
+    if (!brokerSelectionTouched && !brokerStatuses.demo.configured && brokerStatuses.real.configured) selectedBrokerEnvironment = 'real';
+    if (previousEnvironment !== selectedBrokerEnvironment) {
+      $('broker-history').hidden = true;
+      if (operatorToken) loadBrokerHistory().catch(() => { $('broker-history').hidden = true; });
+    }
+    for (const environment of ['demo', 'real']) {
+      const status = brokerStatuses[environment];
+      $(`broker-${environment}-result`).textContent = status.configured ? status.last_result.replaceAll('_', ' ') : 'Not configured';
+      $(`broker-${environment}-detail`).textContent = status.configured
+        ? `HTTP ${status.http_status || '—'} · ${status.snapshot_count} saved · read only`
+        : 'No key confirmed · read only';
+      $(`broker-${environment}`).setAttribute('aria-pressed', String(environment === selectedBrokerEnvironment));
+      $(`broker-${environment}`).classList.toggle('connected', status.configured && status.last_result === 'ok');
+    }
+    const real = brokerStatuses.real, demo = brokerStatuses.demo;
+    $('broker-nav').textContent = real.configured && real.last_result === 'ok' ? 'eToro · REAL' : 'eToro';
+    $('account-environments').textContent = real.configured && real.last_result === 'ok'
+      ? 'REAL ACCOUNT READ · NO ORDERS' : demo.configured && demo.last_result === 'ok'
+        ? 'DEMO ACCOUNT READ · NO ORDERS' : 'ACCOUNT READ · UNAVAILABLE';
+    const status = brokerStatuses[selectedBrokerEnvironment];
+    const label = selectedBrokerEnvironment.toUpperCase();
+    $('broker-selected-banner').textContent = `${label} ACCOUNT · READ ONLY · EXECUTION DISABLED`;
+    $('broker-selected-banner').classList.toggle('real', selectedBrokerEnvironment === 'real');
+    $('broker-connection-heading').textContent = `${selectedBrokerEnvironment === 'real' ? 'Real' : 'Demo'} connection`;
+    $('broker-history-title').textContent = `${selectedBrokerEnvironment === 'real' ? 'Real' : 'Demo'} portfolio over time`;
+    $('broker-chart').setAttribute('aria-label', `Observed eToro ${selectedBrokerEnvironment} account totals`);
+    $('broker-badge').textContent = `${label} · ${status.configured ? status.last_result.toUpperCase().replaceAll('_', ' ') : 'NOT CONFIGURED'}`;
+    $('broker-result').textContent = status.configured ? status.last_result.replaceAll('_', ' ') : 'Not configured';
     $('broker-result').classList.add('small-value');
     $('broker-http').textContent = status.http_status || '—';
     $('broker-attempt').textContent = time(status.last_attempt);
     $('broker-snapshots').textContent = status.snapshot_count;
-    if (!status.configured) $('broker-message').textContent = 'The demo connector has no private credentials on this deployment.';
-    else if (status.last_result === 'permission_denied') $('broker-message').textContent = 'eToro denied demo portfolio access. Check that the user key has Demo + Read permission.';
+    $('broker-sync').disabled = !operatorToken || !status.configured;
+    if (!status.configured) $('broker-message').textContent = `No ${label} key is confirmed. Add an eToro ${label} + Read user key to private settings.`;
+    else if (status.last_result === 'permission_denied') $('broker-message').textContent = `eToro denied ${label} portfolio access. Check this key's environment and Read permission.`;
+    else if (status.last_result === 'credential_conflict') $('broker-message').textContent = `Two keys resolved to ${label}. Remove the extra key from private settings; its account was not imported.`;
   } catch (error) { $('broker-badge').textContent = 'UNAVAILABLE'; $('broker-message').textContent = `Could not read broker status: ${error.message}`; }
 }
 async function loadBrokerHistory() {
-  const data = await request('/api/v1/etoro/snapshots', { headers: { 'X-MFD-Operator-Token': operatorToken } });
+  const environment = selectedBrokerEnvironment;
+  const data = await request(`/api/v1/etoro/snapshots?environment=${environment}`, { headers: { 'X-MFD-Operator-Token': operatorToken } });
+  if (environment !== selectedBrokerEnvironment) return;
   $('broker-history').hidden = false;
-  $('broker-sync').disabled = false;
+  $('broker-sync').disabled = !(brokerStatuses && brokerStatuses[environment].configured);
   $('broker-count').textContent = data.snapshots.length;
   const container = $('broker-records'); container.replaceChildren();
-  if (!data.snapshots.length) { container.append(node('p', 'No authorized demo portfolio snapshot has been imported yet.', 'empty')); $('broker-chart').replaceChildren(); return; }
+  if (!data.snapshots.length) { container.append(node('p', `No ${environment.toUpperCase()} portfolio snapshot has been imported yet.`, 'empty')); $('broker-chart').replaceChildren(); return; }
   const table = node('table'); const head = node('thead'); const headings = node('tr');
   for (const label of ['Fetched', 'Provider time', 'Total value', 'Available cash', 'Current P&L', 'Assets', 'Copies']) headings.append(node('th', label));
   head.append(headings); table.append(head);
@@ -416,22 +448,35 @@ async function loadBrokerHistory() {
   values.forEach((value, index) => svg.append(svgNode('circle', { cx: 65 + index * 630 / Math.max(1, values.length - 1), cy: 30 + (max - value) * 145 / (max - min), r: 5, class: 'chart-point' })));
   $('broker-chart').replaceChildren(svg);
 }
+for (const button of document.querySelectorAll('.broker-environment')) button.onclick = async () => {
+  selectedBrokerEnvironment = button.dataset.environment;
+  brokerSelectionTouched = true;
+  $('broker-history').hidden = true;
+  await refreshBrokerStatus();
+  if (operatorToken) {
+    try { await loadBrokerHistory(); }
+    catch (error) { $('broker-message').textContent = `Could not load account history: ${error.message}`; }
+  }
+};
 $('broker-unlock').onclick = async () => {
   const value = $('operator-token').value.trim();
   if (!value) { $('broker-message').textContent = 'Paste the operator token first.'; return; }
   operatorToken = value; $('operator-token').value = '';
-  try { await loadBrokerHistory(); $('broker-message').textContent = 'Private demo account view unlocked for this tab.'; }
+  try { await loadBrokerHistory(); $('broker-message').textContent = `Private ${selectedBrokerEnvironment.toUpperCase()} account view unlocked for this tab.`; }
   catch (error) { operatorToken = ''; $('broker-sync').disabled = true; $('broker-message').textContent = `Could not unlock account view: ${error.message}`; }
 };
 $('broker-sync').onclick = async () => {
   $('broker-sync').disabled = true;
   try {
-    const status = await request('/api/v1/etoro/sync', { method: 'POST', headers: { 'X-MFD-Operator-Token': operatorToken } });
+    const environment = selectedBrokerEnvironment;
+    const status = await request(`/api/v1/etoro/sync?environment=${environment}`, { method: 'POST', headers: { 'X-MFD-Operator-Token': operatorToken } });
     await refreshBrokerStatus();
     await loadBrokerHistory();
-    $('broker-message').textContent = status.last_result === 'ok' ? 'Demo account snapshot saved.' : `Demo read returned ${status.last_result.replaceAll('_', ' ')} (HTTP ${status.http_status || '—'}).`;
+    $('broker-message').textContent = status.last_result === 'ok' ? `${environment.toUpperCase()} account snapshot saved.`
+      : status.last_result === 'not_configured' ? `No ${environment.toUpperCase()} key confirmed. Check the other account card: the key may have been classified there.`
+        : `${environment.toUpperCase()} read returned ${status.last_result.replaceAll('_', ' ')} (HTTP ${status.http_status || '—'}).`;
   } catch (error) { $('broker-message').textContent = `Sync failed: ${error.message}`; }
-  finally { $('broker-sync').disabled = !operatorToken; }
+  finally { $('broker-sync').disabled = !operatorToken || !brokerStatuses?.[selectedBrokerEnvironment]?.configured; }
 };
 async function health() {
   try {

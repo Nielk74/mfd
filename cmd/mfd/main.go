@@ -60,12 +60,19 @@ func run() error {
 		return err
 	}
 	defer p.Close()
-	apiKey, userKey := os.Getenv("ETORO_API_KEY"), os.Getenv("ETORO_DEMO_USER_KEY")
-	if apiKey != "" || userKey != "" {
-		if apiKey == "" || userKey == "" {
-			return fmt.Errorf("both eToro demo keys are required")
+	apiKey := os.Getenv("ETORO_API_KEY")
+	userKeys := map[string]string{"demo": os.Getenv("ETORO_DEMO_USER_KEY"), "real": os.Getenv("ETORO_REAL_USER_KEY")}
+	if apiKey != "" || userKeys["demo"] != "" || userKeys["real"] != "" {
+		if apiKey == "" || (userKeys["demo"] == "" && userKeys["real"] == "") {
+			return fmt.Errorf("eToro application key and at least one user key are required")
 		}
-		p.Broker, err = platform.NewBrokerService(p.DB, &etoro.Client{APIKey: apiKey, UserKey: userKey}, os.Getenv("MFD_ACCOUNT_ENCRYPTION_KEY"), os.Getenv("MFD_OPERATOR_TOKEN"))
+		clients := map[string]*etoro.Client{}
+		for environment, userKey := range userKeys {
+			if userKey != "" {
+				clients[environment] = &etoro.Client{APIKey: apiKey, UserKey: userKey}
+			}
+		}
+		p.Broker, err = platform.NewBrokerService(p.DB, clients, os.Getenv("MFD_ACCOUNT_ENCRYPTION_KEY"), os.Getenv("MFD_OPERATOR_TOKEN"))
 		if err != nil {
 			return err
 		}
@@ -82,7 +89,7 @@ func run() error {
 		go func() { defer brokerWorkers.Done(); p.Broker.Run(ctx) }()
 	}
 	defer func() { stop(); brokerWorkers.Wait() }()
-	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 40 * time.Second, IdleTimeout: 60 * time.Second}
+	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 65 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)
 	go func() {
 		slog.Info("lab ready", "address", server.Addr, "mode", "fixture", "workers", workers)

@@ -135,6 +135,26 @@ func (p *Platform) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_version WHERE version=4)").Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		if _, err = tx.Exec(ctx, `ALTER TABLE etoro_snapshots ADD COLUMN IF NOT EXISTS environment text NOT NULL DEFAULT 'demo' CHECK (environment IN ('demo','real'))`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `ALTER TABLE etoro_sync_events ADD COLUMN IF NOT EXISTS environment text NOT NULL DEFAULT 'demo' CHECK (environment IN ('demo','real'))`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE INDEX IF NOT EXISTS etoro_snapshots_environment_recent ON etoro_snapshots(environment,fetched_at DESC)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE INDEX IF NOT EXISTS etoro_sync_environment_recent ON etoro_sync_events(environment,attempted_at DESC)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, "INSERT INTO schema_version VALUES(4)"); err != nil {
+			return err
+		}
+	}
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_version WHERE version=2)").Scan(&exists); err != nil {
 		return err
 	}
@@ -427,16 +447,20 @@ func (p *Platform) Metrics(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	configured, readOK := 0, 0
-	if brokerStatus.Configured {
-		configured = 1
-	}
-	if brokerStatus.LastResult == "ok" {
-		readOK = 1
-	}
-	metrics += fmt.Sprintf("# HELP mfd_etoro_configured Whether the read-only demo connector has private credentials.\n# TYPE mfd_etoro_configured gauge\nmfd_etoro_configured %d\n# HELP mfd_etoro_demo_read_ok Whether the most recent official demo portfolio read succeeded.\n# TYPE mfd_etoro_demo_read_ok gauge\nmfd_etoro_demo_read_ok %d\n# HELP mfd_etoro_last_http_status HTTP status of the most recent demo portfolio read, or zero before a request.\n# TYPE mfd_etoro_last_http_status gauge\nmfd_etoro_last_http_status %d\n# HELP mfd_etoro_snapshots Count of encrypted demo portfolio snapshots.\n# TYPE mfd_etoro_snapshots gauge\nmfd_etoro_snapshots %d\n", configured, readOK, brokerStatus.HTTPStatus, brokerStatus.SnapshotCount)
-	if brokerStatus.LastSuccess != nil {
-		metrics += fmt.Sprintf("# HELP mfd_etoro_last_success_timestamp_seconds Last successful eToro demo portfolio import.\n# TYPE mfd_etoro_last_success_timestamp_seconds gauge\nmfd_etoro_last_success_timestamp_seconds %d\n", brokerStatus.LastSuccess.Unix())
+	metrics += "# HELP mfd_etoro_configured Whether a read-only eToro key is assigned to the environment.\n# TYPE mfd_etoro_configured gauge\n# HELP mfd_etoro_read_ok Whether the most recent environment read succeeded.\n# TYPE mfd_etoro_read_ok gauge\n# HELP mfd_etoro_last_http_status HTTP status of the most recent environment read.\n# TYPE mfd_etoro_last_http_status gauge\n# HELP mfd_etoro_snapshots Count of encrypted portfolio snapshots.\n# TYPE mfd_etoro_snapshots gauge\n# HELP mfd_etoro_last_success_timestamp_seconds Last successful portfolio import.\n# TYPE mfd_etoro_last_success_timestamp_seconds gauge\n"
+	for _, environment := range brokerEnvironments {
+		status := brokerStatus.Environments[environment]
+		configured, readOK, success := 0, 0, int64(0)
+		if status.Configured {
+			configured = 1
+		}
+		if status.Configured && status.LastResult == "ok" {
+			readOK = 1
+		}
+		if status.LastSuccess != nil {
+			success = status.LastSuccess.Unix()
+		}
+		metrics += fmt.Sprintf("mfd_etoro_configured{environment=%q} %d\nmfd_etoro_read_ok{environment=%q} %d\nmfd_etoro_last_http_status{environment=%q} %d\nmfd_etoro_snapshots{environment=%q} %d\nmfd_etoro_last_success_timestamp_seconds{environment=%q} %d\n", environment, configured, environment, readOK, environment, status.HTTPStatus, environment, status.SnapshotCount, environment, success)
 	}
 	return metrics, nil
 }

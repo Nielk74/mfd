@@ -1,4 +1,4 @@
-// Package etoro implements a read-only adapter to the documented demo API.
+// Package etoro implements read-only adapters to the documented Demo and Real APIs.
 // It never logs credentials or provider account payloads.
 package etoro
 
@@ -20,7 +20,8 @@ import (
 )
 
 const OfficialBase = "https://public-api.etoro.com"
-const AggregatePath = "/api/v1/trading/info/demo/aggregate-portfolio"
+const DemoAggregatePath = "/api/v1/trading/info/demo/aggregate-portfolio"
+const RealAggregatePath = "/api/v1/trading/info/aggregate-portfolio"
 const maxBody = 2 << 20
 
 type Client struct {
@@ -35,8 +36,14 @@ type APIError struct {
 	Category string
 }
 
+type SchemaError struct{}
+
+func (*SchemaError) Error() string {
+	return "eToro aggregate response does not match the required schema"
+}
+
 func (e *APIError) Error() string {
-	return fmt.Sprintf("eToro demo read: HTTP %d (%s)", e.Status, e.Category)
+	return fmt.Sprintf("eToro account read: HTTP %d (%s)", e.Status, e.Category)
 }
 
 type Instrument struct {
@@ -58,7 +65,22 @@ type Snapshot struct {
 	MirrorCount   int             `json:"mirror_count"`
 }
 
-func (c *Client) FetchAggregate(ctx context.Context) ([]byte, Snapshot, error) {
+func AggregatePath(environment string) (string, error) {
+	switch environment {
+	case "demo":
+		return DemoAggregatePath, nil
+	case "real":
+		return RealAggregatePath, nil
+	default:
+		return "", errors.New("invalid eToro environment")
+	}
+}
+
+func (c *Client) FetchAggregate(ctx context.Context, environment string) ([]byte, Snapshot, error) {
+	path, err := AggregatePath(environment)
+	if err != nil {
+		return nil, Snapshot{}, err
+	}
 	if c.APIKey == "" || c.UserKey == "" {
 		return nil, Snapshot{}, errors.New("eToro credentials not configured")
 	}
@@ -66,7 +88,7 @@ func (c *Client) FetchAggregate(ctx context.Context) ([]byte, Snapshot, error) {
 	if base == "" {
 		base = OfficialBase
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+AggregatePath, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)
 	if err != nil {
 		return nil, Snapshot{}, err
 	}
@@ -80,7 +102,7 @@ func (c *Client) FetchAggregate(ctx context.Context) ([]byte, Snapshot, error) {
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("x-user-key", c.UserKey)
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "mfd-demo-importer/0.2")
+	req.Header.Set("User-Agent", "mfd-account-importer/0.3")
 	httpClient := c.HTTP
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -116,7 +138,7 @@ func (c *Client) FetchAggregate(ctx context.Context) ([]byte, Snapshot, error) {
 	}
 	snapshot, err := ParseAggregate(raw)
 	if err != nil {
-		return nil, Snapshot{}, fmt.Errorf("eToro aggregate schema: %w", err)
+		return nil, Snapshot{}, &SchemaError{}
 	}
 	return raw, snapshot, nil
 }
@@ -138,8 +160,8 @@ func ParseAggregate(raw []byte) (Snapshot, error) {
 	if decoder.Decode(&trailing) != io.EOF {
 		return Snapshot{}, errors.New("unexpected trailing aggregate data")
 	}
-	if envelope.Timestamp.IsZero() || envelope.AccountCurrency != "USD" || envelope.AccountTotals == nil {
-		return Snapshot{}, errors.New("missing timestamp, USD currency or account totals")
+	if envelope.Timestamp.IsZero() || envelope.AccountCurrency != "USD" || envelope.AccountTotals == nil || envelope.InstrumentAggregates == nil || envelope.Mirrors == nil {
+		return Snapshot{}, errors.New("missing timestamp, USD currency, account totals or position arrays")
 	}
 	requiredDecimal := func(name string) (decimal.Decimal, error) {
 		value, ok := envelope.AccountTotals[name]

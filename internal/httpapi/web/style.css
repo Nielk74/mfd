@@ -127,4 +127,19 @@ footer{border-top:1px solid var(--line);display:flex;justify-content:space-betwe
 @media(max-width:400px){.nav-button{font-size:10px}.summary-card strong{font-size:20px}.field-pair{gap:8px}.selected-facts span{font-size:9px}.compare-grid strong{font-size:15px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.primary{transition:none}.primary:hover{transform:none}}
 .broker-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.broker-actions .primary{justify-content:center}.broker-history{margin-top:15px}.broker-history table{min-width:740px}.broker-history .chart{max-width:900px}.ops-metrics strong.small-value{font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.account-state{font-size:10px;font-weight:800;letter-spacing:.7px;color:#fff0c6;background:#6b4b19;border:1px solid #ad8244;border-radius:20px;padding:7px 11px;white-space:nowrap}
+.broker-environment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 13px}
+.broker-environment{display:grid;gap:5px;text-align:left;padding:17px 19px;border:1px solid #b9d7cb;border-radius:12px;background:#f5fcf8;color:var(--ink)}
+.broker-environment.real{border-color:#e7c88d;background:#fffaf0}
+.broker-environment[aria-pressed=true]{outline:3px solid #45a587;outline-offset:0}
+.broker-environment.real[aria-pressed=true]{outline-color:#b77924}
+.broker-environment.connected{box-shadow:inset 4px 0 #158066}
+.broker-environment.real.connected{box-shadow:inset 4px 0 #b77924}
+.broker-environment-name{font-size:11px;font-weight:850;letter-spacing:1.3px;color:#166a57}
+.broker-environment.real .broker-environment-name{color:#895711}
+.broker-environment strong{font-size:17px;text-transform:capitalize}
+.broker-environment small{font-size:11px;color:var(--muted)}
+.broker-selected-banner{border-radius:9px;padding:10px 14px;margin:0 0 15px;background:#dff4e9;color:#075e4b;font-size:11px;font-weight:850;letter-spacing:.7px}
+.broker-selected-banner.real{background:#fff0cf;color:#74480b;border:1px solid #e7c88d}
 @media(max-width:730px){.primary-nav{justify-content:flex-start}.nav-button{flex:none;padding:0 8px}}
+@media(max-width:730px){.broker-environment-grid{grid-template-columns:1fr}.account-state{order:1;width:100%;text-align:center}.environment{display:none}}

@@ -2,7 +2,7 @@
   "uid": "mfd-operations",
   "title": "mfd / Queue & database operations",
   "schemaVersion": 41,
-  "version": 4,
+  "version": 5,
   "refresh": "10s",
   "time": {
     "from": "now-1h",
@@ -642,7 +642,7 @@
     },
     {
       "id": 104,
-      "title": "eToro demo connector \u00b7 read-only access",
+      "title": "eToro accounts \u00b7 read only \u00b7 no account amounts",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -657,7 +657,7 @@
       "id": 14,
       "title": "Demo read succeeded",
       "type": "stat",
-      "description": "0 means no successful demo portfolio read. Check the connector state in the lab; a denied key is not a valuation.",
+      "description": "1 means the latest official Demo aggregate read succeeded.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
@@ -671,8 +671,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "mfd_etoro_demo_read_ok",
-          "legendFormat": "1 = available",
+          "expr": "mfd_etoro_read_ok{environment=\"demo\"}",
+          "legendFormat": "Demo",
           "instant": true,
           "range": false
         }
@@ -700,9 +700,9 @@
     },
     {
       "id": 15,
-      "title": "Last provider HTTP status",
+      "title": "Real read succeeded",
       "type": "stat",
-      "description": "403 means the official demo portfolio endpoint denied access; 0 means no request has run.",
+      "description": "1 means the latest official Real aggregate read succeeded. Orders remain disabled.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
@@ -716,8 +716,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "mfd_etoro_last_http_status",
-          "legendFormat": "Status",
+          "expr": "mfd_etoro_read_ok{environment=\"real\"}",
+          "legendFormat": "Real",
           "instant": true,
           "range": false
         }
@@ -747,7 +747,7 @@
       "id": 16,
       "title": "Encrypted account snapshots",
       "type": "stat",
-      "description": "Successful provider responses are encrypted before storage. No account value is in Prometheus.",
+      "description": "Raw successful responses are encrypted. No account value is in Prometheus.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
@@ -762,7 +762,97 @@
         {
           "refId": "A",
           "expr": "mfd_etoro_snapshots",
-          "legendFormat": "Snapshots",
+          "legendFormat": "{{environment}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 17,
+      "title": "Demo HTTP status",
+      "type": "stat",
+      "description": "Most recent Demo aggregate response; 0 means no read.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mfd-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mfd_etoro_last_http_status{environment=\"demo\"}",
+          "legendFormat": "Demo",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 18,
+      "title": "Real HTTP status",
+      "type": "stat",
+      "description": "Most recent Real aggregate response; 0 means no read.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mfd-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 45,
+        "w": 12,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "mfd_etoro_last_http_status{environment=\"real\"}",
+          "legendFormat": "Real",
           "instant": true,
           "range": false
         }

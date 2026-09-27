@@ -16,9 +16,9 @@
         <button class="nav-button active" data-view="workspace" aria-current="page">Workspace</button>
         <button class="nav-button" data-view="decisions">Decisions</button>
         <button class="nav-button" data-view="systems">Queues &amp; database</button>
-        <button class="nav-button" data-view="broker">eToro</button>
+        <button class="nav-button" data-view="broker" id="broker-nav">eToro</button>
       </nav>
-      <span class="environment">FIXTURE MODE</span>
+      <span class="environment">FIXTURE RESEARCH</span><span id="account-environments" class="account-state">ACCOUNT READ: CHECKING</span>
     </header>
     <main id="main">
       <section class="hero">
@@ -32,7 +32,7 @@
           <button id="hero-create" class="primary">New experiment <span aria-hidden="true">↗</span></button>
         </div>
       </section>
-      <div class="fixture-notice"><strong>Artificial data</strong><span>Two fixed virtual sleeves, three quote observations. Scenarios change the last quote only. These marks are not historical returns; no broker or execution is connected.</span></div>
+      <div class="fixture-notice"><strong>Artificial data</strong><span>Two fixed virtual sleeves, three quote observations. Scenarios change the last quote only. These marks are not historical returns or broker account values. eToro account reads are separate; execution is disabled.</span></div>
       <p id="status" role="status" aria-live="polite" class="status-line">Loading workspace…</p>
 
       <div class="summary-grid" aria-label="Selected experiment summary">
@@ -102,15 +102,20 @@
         <section class="surface job-surface"><div class="section-heading"><div><p class="eyebrow">PIPELINE / AUDIT</p><h3>Recent jobs</h3></div><span id="ops-updated" class="muted">—</span></div><div class="table-scroll"><table><thead><tr><th>Experiment</th><th>Run</th><th>Status</th><th>Enqueued</th><th>Published</th><th>Finished</th></tr></thead><tbody id="job-rows"><tr><td colspan="6">Loading jobs…</td></tr></tbody></table></div></section>
         <div class="observability-links"><a href="https://mfd-grafana.aklein.fr/d/mfd-lab" target="_blank" rel="noopener">Open Grafana dashboard ↗</a><a href="https://mfd-prometheus.aklein.fr" target="_blank" rel="noopener">Explore Prometheus ↗</a></div>
       </section>
-      <section id="broker-view" class="view" aria-label="eToro demo account" hidden>
-        <div class="page-heading"><div><p class="eyebrow">PROVIDER / DEMO ACCOUNT</p><h2>eToro connection</h2><p>Official read-only portfolio import. Account details require an operator token.</p></div><span id="broker-badge" class="small-tag">CHECKING</span></div>
-        <div class="ops-grid">
-          <section class="surface"><div class="section-heading"><div><p class="eyebrow">ACCESS / LAST CHECK</p><h3>Connection state</h3></div></div><div class="ops-metrics"><div><span>Demo portfolio</span><strong id="broker-result">—</strong></div><div><span>HTTP status</span><strong id="broker-http">—</strong></div><div><span>Last attempt</span><strong id="broker-attempt" class="small-value">—</strong></div><div><span>Snapshots saved</span><strong id="broker-snapshots">—</strong></div></div><p class="footnote">The adapter uses the official demo aggregated portfolio endpoint. A denied read never becomes a portfolio valuation.</p></section>
-          <section class="surface"><div class="section-heading"><div><p class="eyebrow">OPERATOR / PRIVATE</p><h3>Inspect account history</h3></div></div><p class="section-copy">Use the operator token from this machine’s private deployment settings. It stays in this browser tab’s memory.</p><label>Operator token<input id="operator-token" type="password" autocomplete="off" placeholder="Paste token to unlock account view" /></label><div class="broker-actions"><button id="broker-unlock" class="primary">Unlock account view</button><button id="broker-sync" class="secondary" disabled>Sync now</button></div><p id="broker-message" class="muted">Portfolio values are hidden until unlocked.</p></section>
+      <section id="broker-view" class="view" aria-label="eToro accounts" hidden>
+        <div class="page-heading"><div><p class="eyebrow">PROVIDER / ACCOUNT OBSERVATION</p><h2>eToro accounts</h2><p>Official portfolio reads. Demo and Real stay separate; orders are disabled.</p></div><span id="broker-badge" class="small-tag">CHECKING</span></div>
+        <div class="broker-environment-grid" aria-label="eToro environments">
+          <button id="broker-demo" class="broker-environment" data-environment="demo" aria-pressed="true"><span class="broker-environment-name">DEMO ACCOUNT</span><strong id="broker-demo-result">Checking…</strong><small id="broker-demo-detail">Read-only · no orders</small></button>
+          <button id="broker-real" class="broker-environment real" data-environment="real" aria-pressed="false"><span class="broker-environment-name">REAL ACCOUNT</span><strong id="broker-real-result">Checking…</strong><small id="broker-real-detail">Read-only · no orders</small></button>
         </div>
-        <section id="broker-history" class="surface broker-history" hidden><div class="section-heading"><div><p class="eyebrow">ACCOUNT / OBSERVED SNAPSHOTS</p><h3>Demo portfolio over time</h3></div><span id="broker-count" class="count">0</span></div><div id="broker-chart" class="chart" role="img" aria-label="Observed eToro demo account totals"></div><div id="broker-records" class="table-scroll"></div><p class="footnote">These are provider-reported demo values, separate from artificial fixture sleeves. Raw responses are encrypted before storage.</p></section>
+        <p id="broker-selected-banner" class="broker-selected-banner">DEMO ACCOUNT · READ ONLY · EXECUTION DISABLED</p>
+        <div class="ops-grid">
+          <section class="surface"><div class="section-heading"><div><p class="eyebrow">ACCESS / LAST CHECK</p><h3 id="broker-connection-heading">Demo connection</h3></div></div><div class="ops-metrics"><div><span>Portfolio read</span><strong id="broker-result">—</strong></div><div><span>HTTP status</span><strong id="broker-http">—</strong></div><div><span>Last attempt</span><strong id="broker-attempt" class="small-value">—</strong></div><div><span>Snapshots saved</span><strong id="broker-snapshots">—</strong></div></div><p class="footnote">The endpoint follows the confirmed key environment. Denied and malformed reads never become account valuations.</p></section>
+          <section class="surface"><div class="section-heading"><div><p class="eyebrow">OPERATOR / PRIVATE</p><h3>Inspect account history</h3></div></div><p class="section-copy">Use the operator token from this machine’s private deployment settings. It stays in this browser tab’s memory.</p><label>Operator token<input id="operator-token" type="password" autocomplete="off" placeholder="Paste token to unlock account view" /></label><div class="broker-actions"><button id="broker-unlock" class="primary">Unlock account view</button><button id="broker-sync" class="secondary" disabled>Sync selected account</button></div><p id="broker-message" class="muted">Portfolio values are hidden until unlocked.</p></section>
+        </div>
+        <section id="broker-history" class="surface broker-history" hidden><div class="section-heading"><div><p class="eyebrow">ACCOUNT / OBSERVED SNAPSHOTS</p><h3 id="broker-history-title">Demo portfolio over time</h3></div><span id="broker-count" class="count">0</span></div><div id="broker-chart" class="chart" role="img" aria-label="Observed account totals"></div><div id="broker-records" class="table-scroll"></div><p class="footnote">Provider-reported values for the selected account environment, separate from artificial sleeves. Raw responses are encrypted before storage.</p></section>
       </section>
-      <footer><span id="health">Dependencies: checking</span><span id="revision">Build: checking</span><span>Artificial experiment data · no eToro account values</span></footer>
+      <footer><span id="health">Dependencies: checking</span><span id="revision">Build: checking</span><span>Fixture views use artificial data · eToro account view is separate</span></footer>
     </main>
   </body>
 </html>

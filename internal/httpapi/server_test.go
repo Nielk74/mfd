@@ -25,14 +25,16 @@ func (s *stub) Run(context.Context, string) (platform.Run, error) { return platf
 func (s *stub) Operations(context.Context) (platform.Operations, error) {
 	return platform.Operations{}, nil
 }
-func (s *stub) BrokerStatus(context.Context) (platform.BrokerStatus, error) {
-	return platform.BrokerStatus{}, nil
+func (s *stub) BrokerStatus(context.Context) (platform.BrokerOverview, error) {
+	return platform.BrokerOverview{}, nil
 }
-func (s *stub) BrokerAuthorized(token string) bool                               { return token == "test-operator-token" }
-func (s *stub) BrokerHistory(context.Context) ([]platform.BrokerSnapshot, error) { return nil, nil }
-func (s *stub) BrokerSync(ctx context.Context) (platform.BrokerStatus, error) {
+func (s *stub) BrokerAuthorized(token string) bool { return token == "test-operator-token" }
+func (s *stub) BrokerHistory(context.Context, string) ([]platform.BrokerSnapshot, error) {
+	return nil, nil
+}
+func (s *stub) BrokerSync(ctx context.Context, environment string) (platform.BrokerStatus, error) {
 	s.syncDeadline, _ = ctx.Deadline()
-	return platform.BrokerStatus{}, nil
+	return platform.BrokerStatus{Environment: environment}, nil
 }
 func (s *stub) Ready(context.Context) map[string]bool   { return map[string]bool{"postgres": true} }
 func (s *stub) Metrics(context.Context) (string, error) { return "", nil }
@@ -92,5 +94,27 @@ func TestBrokerSyncAllowsProviderDeadline(t *testing.T) {
 	New(s).ServeHTTP(w, r)
 	if w.Code != http.StatusOK || s.syncDeadline.Sub(start) < 25*time.Second {
 		t.Fatalf("provider sync deadline too short: status=%d window=%s", w.Code, s.syncDeadline.Sub(start))
+	}
+}
+func TestBrokerEnvironmentBoundary(t *testing.T) {
+	for _, path := range []string{"/api/v1/etoro/snapshots?environment=paper", "/api/v1/etoro/sync?environment=paper"} {
+		method := http.MethodGet
+		if strings.Contains(path, "/sync") {
+			method = http.MethodPost
+		}
+		r := httptest.NewRequest(method, "http://localhost"+path, nil)
+		r.Header.Set("X-MFD-Operator-Token", "test-operator-token")
+		w := httptest.NewRecorder()
+		New(&stub{}).ServeHTTP(w, r)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("invalid environment accepted at %s: %d", path, w.Code)
+		}
+	}
+	r := httptest.NewRequest(http.MethodPost, "http://localhost/api/v1/etoro/sync?environment=real", nil)
+	r.Header.Set("X-MFD-Operator-Token", "test-operator-token")
+	w := httptest.NewRecorder()
+	New(&stub{}).ServeHTTP(w, r)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"environment":"real"`) {
+		t.Fatal("real environment not routed")
 	}
 }

@@ -1,4 +1,4 @@
-# Verification — 25 September 2026
+# Verification — through 27 September 2026
 
 ## Local results
 
@@ -14,11 +14,13 @@
 
 GitHub CI repeats Go checks, builds the Compose stack, and runs the smoke/recovery scripts. Browser checks were performed locally; they are not part of CI yet.
 
-## eToro demo check
+## eToro account checks
 
-The initial key produced HTTP 403 on the official demo P&L endpoint; its response looked like an edge rejection. With the next supplied key, the watchlists endpoint returned HTTP 200, while demo portfolio and P&L returned HTTP 403 with an access/permission error. The latest supplied key also returned HTTP 403 with the same error category on the three documented demo reads: [portfolio breakdown](https://api-portal.etoro.com/api-reference/trading--demo/get-demo-portfolio-breakdown), [aggregated portfolio](https://api-portal.etoro.com/api-reference/trading--demo/get-aggregated-portfolio-snapshot) and [P&L](https://api-portal.etoro.com/api-reference/trading--demo/get-account-pnl-and-portfolio-details). Only GET requests were made. No account values or orders were saved, and credentials and response bodies are absent from the repository.
+The initial key produced HTTP 403 on the official demo P&L endpoint; its response looked like an edge rejection. With the next supplied key, the watchlists endpoint returned HTTP 200, while demo portfolio and P&L returned HTTP 403 with an access/permission error. The latest supplied key also returned HTTP 403 with the same error category on the three documented demo reads: [portfolio breakdown](https://api-portal.etoro.com/api-reference/trading--demo/get-demo-portfolio-breakdown), [aggregated portfolio](https://api-portal.etoro.com/api-reference/trading--demo/get-aggregated-portfolio-snapshot) and [P&L](https://api-portal.etoro.com/api-reference/trading--demo/get-account-pnl-and-portfolio-details). Only GET requests were made in those probes; no account values or orders were saved then, and credentials and response bodies are absent from the repository.
 
-The error does not establish which specific permission is missing. [eToro's authentication guide](https://api-portal.etoro.com/getting-started/authentication) says a user key must be generated for the Demo environment with Read permission to access demo account data. The lab therefore remains in fixture mode. The next broker milestone needs a successful authenticated demo read and sanitized contract fixtures.
+The Demo error alone did not establish which permission was missing. On 27 September, the same supplied key returned HTTP 200 on the [official Real aggregate endpoint](https://api-portal.etoro.com/api-reference/trading--real/get-aggregated-portfolio-snapshot) and HTTP 403 on the Demo aggregate endpoint. Its Real response had the required aggregate schema. [eToro's authentication guide](https://api-portal.etoro.com/getting-started/authentication) says user keys are generated separately for Demo or Real with Read/Write permissions. This confirms Real read scope for the supplied key; a separate Demo + Read key is needed for a Demo account snapshot. The artificial experiment remains in fixture mode.
+
+An isolated Compose deployment with that key still in the Demo settings slot detected and relabeled it as Real. Its database recorded the Demo denial and saved an encrypted Real response; the Real history was available only with the operator token, the Demo history stayed empty, and both environments rejected unauthenticated history reads. Decimal account totals crossed the API as strings. Desktop and 390-pixel mobile browser checks showed the Real read-only banner, no horizontal overflow or page errors, and no token in browser storage. No account values were written to test output or Prometheus. A real Demo key and simultaneous two-key provider reads remain unverified.
 
 ## Interactive lab and monitoring extension
 

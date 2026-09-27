@@ -33,7 +33,7 @@ def note(pid, title, y, content):
     return {'id': pid, 'title': title, 'type': 'text', 'gridPos': {'x': 0, 'y': y, 'w': 24, 'h': 3}, 'options': {'mode': 'markdown', 'content': content}}
 
 def dashboard(uid, title, tags, panels, links):
-    return {'uid': uid, 'title': title, 'schemaVersion': 41, 'version': 4, 'refresh': '10s', 'time': {'from': 'now-1h', 'to': 'now'}, 'timezone': 'browser', 'tags': tags, 'links': [{'title': name, 'type': 'link', 'url': url, 'targetBlank': True} for name, url in links], 'panels': panels}
+    return {'uid': uid, 'title': title, 'schemaVersion': 41, 'version': 5, 'refresh': '10s', 'time': {'from': 'now-1h', 'to': 'now'}, 'timezone': 'browser', 'tags': tags, 'links': [{'title': name, 'type': 'link', 'url': url, 'targetBlank': True} for name, url in links], 'panels': panels}
 
 lab = [
     row(100, 'Current artificial experiment · latest completed run', 0),
@@ -68,10 +68,12 @@ ops = [
     panel(12, 'Latest completion time', 'timeseries', 8, 29, 8, 7, [('mfd_latest_run_duration_seconds', 'Seconds')], 'Elapsed time from enqueue to committed result for the most recently completed fixture run.', 's', 2),
     panel(13, 'Failed runs', 'timeseries', 16, 29, 8, 7, [('mfd_runs{status="failed"}', 'Failed')], 'Lifetime failed run count; inspect individual failures in the lab.', 'short', 0),
     note(103, 'Inspect jobs directly', 36, 'Use [Queues & database in the lab](https://mfd.aklein.fr) to inspect the current NATS consumer, PostgreSQL run counts, outbox state and recent jobs. These panels do not expose raw SQL or private broker data.'),
-    row(104, 'eToro demo connector · read-only access', 39),
-    panel(14, 'Demo read succeeded', 'stat', 0, 40, 8, 5, [('mfd_etoro_demo_read_ok', '1 = available')], '0 means no successful demo portfolio read. Check the connector state in the lab; a denied key is not a valuation.', 'short', 0),
-    panel(15, 'Last provider HTTP status', 'stat', 8, 40, 8, 5, [('mfd_etoro_last_http_status', 'Status')], '403 means the official demo portfolio endpoint denied access; 0 means no request has run.', 'short', 0),
-    panel(16, 'Encrypted account snapshots', 'stat', 16, 40, 8, 5, [('mfd_etoro_snapshots', 'Snapshots')], 'Successful provider responses are encrypted before storage. No account value is in Prometheus.', 'short', 0),
+    row(104, 'eToro accounts · read only · no account amounts', 39),
+    panel(14, 'Demo read succeeded', 'stat', 0, 40, 8, 5, [('mfd_etoro_read_ok{environment="demo"}', 'Demo')], '1 means the latest official Demo aggregate read succeeded.', 'short', 0),
+    panel(15, 'Real read succeeded', 'stat', 8, 40, 8, 5, [('mfd_etoro_read_ok{environment="real"}', 'Real')], '1 means the latest official Real aggregate read succeeded. Orders remain disabled.', 'short', 0),
+    panel(16, 'Encrypted account snapshots', 'stat', 16, 40, 8, 5, [('mfd_etoro_snapshots', '{{environment}}')], 'Raw successful responses are encrypted. No account value is in Prometheus.', 'short', 0),
+    panel(17, 'Demo HTTP status', 'stat', 0, 45, 12, 5, [('mfd_etoro_last_http_status{environment="demo"}', 'Demo')], 'Most recent Demo aggregate response; 0 means no read.', 'short', 0),
+    panel(18, 'Real HTTP status', 'stat', 12, 45, 12, 5, [('mfd_etoro_last_http_status{environment="real"}', 'Real')], 'Most recent Real aggregate response; 0 means no read.', 'short', 0),
 ]
 ROOT.mkdir(parents=True, exist_ok=True)
 for filename, data in [

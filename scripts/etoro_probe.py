@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Diagnose official eToro demo read access without recording account payloads.
+"""Identify Demo/Real read scope using official eToro aggregate endpoints.
 
-Supply ETORO_API_KEY and ETORO_DEMO_USER_KEY privately in the environment.
+Supply ETORO_API_KEY and one or both eToro user keys privately.
 Only GET requests are made. Neither credentials nor response values are logged.
 """
 import json
@@ -14,9 +14,8 @@ import uuid
 BASE = "https://public-api.etoro.com"
 ENDPOINTS = [
     ("watchlists", "/api/v1/watchlists"),
-    ("demo/portfolio", "/api/v1/trading/info/demo/portfolio"),
     ("demo/aggregate-portfolio", "/api/v1/trading/info/demo/aggregate-portfolio"),
-    ("demo/pnl", "/api/v1/trading/info/demo/pnl"),
+    ("real/aggregate-portfolio", "/api/v1/trading/info/aggregate-portfolio"),
 ]
 
 
@@ -60,13 +59,21 @@ def probe(label, path, api_key, user_key):
 
 def main():
     api_key = os.environ.get("ETORO_API_KEY")
-    user_key = os.environ.get("ETORO_DEMO_USER_KEY")
-    if not api_key or not user_key:
-        print("Set ETORO_API_KEY and ETORO_DEMO_USER_KEY in a private local environment.", file=sys.stderr)
+    keys = {slot: os.environ.get(f"ETORO_{slot.upper()}_USER_KEY") for slot in ("demo", "real")}
+    if not api_key or not any(keys.values()):
+        print("Set ETORO_API_KEY and at least one eToro user key in a private local environment.", file=sys.stderr)
         return 2
-    results = [probe(*endpoint, api_key, user_key) for endpoint in ENDPOINTS]
-    print(json.dumps({"read_only": True, "results": results}))
-    return 0 if all(result.get("http_status") == 200 for result in results) else 1
+    output = []
+    for slot, user_key in keys.items():
+        if not user_key:
+            continue
+        results = [probe(*endpoint, api_key, user_key) for endpoint in ENDPOINTS]
+        successful = [name.split("/")[0] for name in ("demo/aggregate-portfolio", "real/aggregate-portfolio")
+                      if any(result.get("endpoint") == name and result.get("http_status") == 200 for result in results)]
+        output.append({"configured_slot": slot, "confirmed_environment": successful[0] if len(successful) == 1 else "unknown",
+                       "results": results})
+    print(json.dumps({"read_only": True, "keys": output}))
+    return 0 if all(item["confirmed_environment"] != "unknown" for item in output) else 1
 
 
 if __name__ == "__main__":

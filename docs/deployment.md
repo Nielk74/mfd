@@ -43,7 +43,7 @@ The default state directory is `~/.local/share/mfd`, outside the working reposit
 
 - `config.json`: repository, branch, project and Docker context.
 - `settings.env`: network bindings, ports and worker count.
-- `settings.env` also holds the eToro demo keys, account encryption key and operator token when the connector is configured. It is private to this user (`0600`) under a `0700` directory; no secret is in Git. Changing this file makes the scheduled updater recreate and verify the current app release on its next check.
+- `settings.env` also holds the eToro application key, Demo and/or Real user keys, account encryption key and operator token when the connector is configured. It is private to this user (`0600`) under a `0700` directory; no secret is in Git. Changing this file makes the scheduled updater recreate and verify the current app release on its next check.
 - `status.json`: current/candidate SHA, CI link, last check, deployment time and error.
 - `deploy.log`: rotating update log; `build.log`: latest build output.
 - `releases/<sha>/`: immutable release checkout; the development checkout is untouched.
@@ -60,6 +60,6 @@ Run the installed updater manually for an immediate check. The same lock protect
 
 Release checkouts, images and backups are retained for recovery. Prune them deliberately after reviewing `current_sha` and `previous_sha`; do not run volume-deleting cleanup against this project. Deployment rollback restores containers, not a database schema downgrade. Future migrations must remain compatible with the prior release or define an explicit recovery procedure. Backups are not automatically restored over newer data.
 
-Use the HTTPS lab URL for the eToro tab. It accepts `MFD_OPERATOR_TOKEN` from `~/.local/share/mfd/settings.env` for private account history and manual sync. The token stays in the current browser tab's memory. Replacing `ETORO_DEMO_USER_KEY` in the same file reloads the demo adapter after the updater observes the changed settings. The encryption key must stay stable to read past snapshots.
+Use the HTTPS lab URL for the eToro tab. It accepts `MFD_OPERATOR_TOKEN` from `~/.local/share/mfd/settings.env` for private Demo or Real account history and manual sync. The token stays in the current browser tab's memory. Add `ETORO_DEMO_USER_KEY` and/or `ETORO_REAL_USER_KEY` beside the shared `ETORO_API_KEY`; a successful read detects a misplaced key and switches it to the correct environment. Changing private settings causes the updater to recreate the app. The encryption key must stay stable to read past snapshots. Real credentials grant read access here only; no order route exists.
 
 This is the requested network-accessible fixture lab. Application authentication is still a roadmap item, Grafana allows anonymous viewing, and infrastructure uses development credentials. Network access is not a completed live-trading security deployment.

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: mfd fixture lab
-  version: 0.2.0
-  description: Artificial experiment lab with a protected read-only eToro demo importer. Broker order and model execution are unavailable.
+  version: 0.3.0
+  description: Artificial experiment lab with separate protected read-only eToro Demo and Real importers. Broker order and model execution are unavailable.
 servers:
   - url: https://mfd.aklein.fr
   - url: http://localhost:8088
@@ -89,39 +89,45 @@ paths:
         '503': {description: PostgreSQL unavailable}
   /api/v1/etoro/status:
     get:
-      operationId: getEtoroDemoStatus
-      summary: Read-only connector status without account values
+      operationId: getEtoroAccountStatus
+      summary: Demo and Real read status without account values
       responses:
         '200':
-          description: Latest demo read result and encrypted snapshot count
+          description: Latest read result and encrypted snapshot count for each environment
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/BrokerStatus'}
+              schema: {$ref: '#/components/schemas/BrokerOverview'}
   /api/v1/etoro/snapshots:
     get:
-      operationId: listEtoroDemoSnapshots
-      summary: Latest 30 decrypted demo portfolio summaries
+      operationId: listEtoroSnapshots
+      summary: Latest 30 decrypted portfolio summaries for one environment
+      parameters:
+        - {$ref: '#/components/parameters/BrokerEnvironment'}
       security: [{operatorToken: []}]
       responses:
         '200':
-          description: Provider-reported demo values and instrument IDs, separate from artificial sleeves
+          description: Provider-reported values and instrument IDs for the selected environment, separate from artificial sleeves
           content:
             application/json:
               schema:
                 type: object
-                required: [snapshots, limit]
+                required: [environment, snapshots, limit]
                 properties:
+                  environment: {type: string, enum: [demo, real]}
                   limit: {type: integer, const: 30}
                   snapshots:
                     type: array
                     items: {$ref: '#/components/schemas/BrokerSnapshot'}
         '401': {description: Operator token required}
+        '400': {description: Invalid environment}
         '503': {description: Encrypted data unavailable or invalid}
   /api/v1/etoro/sync:
     post:
-      operationId: syncEtoroDemo
-      summary: Request an official read-only demo portfolio import
-      description: At most one provider request every 30 seconds; a denied read records a status, not an account snapshot.
+      operationId: syncEtoroAccount
+      summary: Request an official read-only portfolio import for one environment
+      description: A denied key is checked once against the other documented endpoint and is assigned only after a valid response. At most one sync per key every 30 seconds. Denied or malformed reads create a status, never an account snapshot.
+      parameters:
+        - {$ref: '#/components/parameters/BrokerEnvironment'}
       security: [{operatorToken: []}]
       responses:
         '200':
@@ -130,6 +136,7 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/BrokerStatus'}
         '401': {description: Operator token required}
+        '400': {description: Invalid environment}
         '503': {description: Local storage unavailable}
   /healthz:
     get:
@@ -149,19 +156,37 @@ paths:
         '200': {description: Prometheus text exposition}
         '503': {description: Database metrics unavailable}
 components:
+  parameters:
+    BrokerEnvironment:
+      name: environment
+      in: query
+      description: Defaults to demo for older clients; specify explicitly for new clients.
+      schema: {type: string, enum: [demo, real], default: demo}
   securitySchemes:
     operatorToken:
       type: apiKey
       in: header
       name: X-MFD-Operator-Token
   schemas:
+    BrokerOverview:
+      type: object
+      required: [provider, execution_enabled, environments]
+      properties:
+        provider: {type: string, const: etoro}
+        execution_enabled: {type: boolean, const: false}
+        environments:
+          type: object
+          required: [demo, real]
+          properties:
+            demo: {$ref: '#/components/schemas/BrokerStatus'}
+            real: {$ref: '#/components/schemas/BrokerStatus'}
     BrokerStatus:
       type: object
       required: [configured, provider, environment, last_attempt, last_result, http_status, last_success, snapshot_count, execution_enabled]
       properties:
         configured: {type: boolean}
         provider: {type: string, const: etoro}
-        environment: {type: string, const: demo}
+        environment: {type: string, enum: [demo, real]}
         last_attempt: {type: [string, 'null'], format: date-time}
         last_result: {type: string}
         http_status: {type: integer}
@@ -170,9 +195,10 @@ components:
         execution_enabled: {type: boolean, const: false}
     BrokerSnapshot:
       type: object
-      required: [id, fetched_at, source_sha256, portfolio]
+      required: [id, environment, fetched_at, source_sha256, portfolio]
       properties:
         id: {type: string, format: uuid}
+        environment: {type: string, enum: [demo, real]}
         fetched_at: {type: string, format: date-time}
         source_sha256: {type: string, description: Hash of the encrypted source payload}
         portfolio:
