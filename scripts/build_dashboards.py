@@ -33,20 +33,20 @@ def note(pid, title, y, content):
     return {'id': pid, 'title': title, 'type': 'text', 'gridPos': {'x': 0, 'y': y, 'w': 24, 'h': 3}, 'options': {'mode': 'markdown', 'content': content}}
 
 def dashboard(uid, title, tags, panels, links):
-    return {'uid': uid, 'title': title, 'schemaVersion': 41, 'version': 5, 'refresh': '10s', 'time': {'from': 'now-1h', 'to': 'now'}, 'timezone': 'browser', 'tags': tags, 'links': [{'title': name, 'type': 'link', 'url': url, 'targetBlank': True} for name, url in links], 'panels': panels}
+    return {'uid': uid, 'title': title, 'schemaVersion': 41, 'version': 6, 'refresh': '10s', 'time': {'from': 'now-1h', 'to': 'now'}, 'timezone': 'browser', 'tags': tags, 'links': [{'title': name, 'type': 'link', 'url': url, 'targetBlank': True} for name, url in links], 'panels': panels}
 
 lab = [
-    row(100, 'Current artificial experiment · latest completed run', 0),
-    panel(1, 'Final marked equity', 'stat', 0, 1, 6, 5, [('mfd_fixture_latest_equity_usd{scope="total"}', 'Total')], 'USD midpoint value of fixed holdings at the last artificial observation. No realized strategy return.', 'currencyUSD', 2),
-    panel(2, 'Unrealized P&L', 'stat', 6, 1, 6, 5, [('mfd_fixture_latest_unrealized_pnl_usd{scope="total"}', 'Total')], 'Artificial mark minus fixed position cost. Excludes trading, fees and cash flows.', 'currencyUSD', 2),
+    row(100, 'Current research scenario · latest completed run', 0),
+    panel(1, 'Final marked equity', 'stat', 0, 1, 6, 5, [('mfd_fixture_latest_equity_usd{scope="total"}', 'Total')], 'USD midpoint value of fixed holdings at the last simulated scenario price. No realized strategy return.', 'currencyUSD', 2),
+    panel(2, 'Unrealized P&L', 'stat', 6, 1, 6, 5, [('mfd_fixture_latest_unrealized_pnl_usd{scope="total"}', 'Total')], 'Scenario mark minus fixed position cost. Excludes trading, fees and cash flows.', 'currencyUSD', 2),
     panel(3, 'Review decisions', 'stat', 12, 1, 6, 5, [('mfd_fixture_latest_decisions{action="review"}', 'Review')], 'Decisions asking for review in the latest completed fixture experiment. No order is sent.', 'short', 0),
     panel(4, 'Enqueue → result', 'stat', 18, 1, 6, 5, [('mfd_latest_run_duration_seconds', 'Seconds')], 'Elapsed wall time from accepting the replay to storing its result.', 's', 2),
-    row(101, 'How artificial marks and decisions changed between runs', 6),
-    panel(5, 'Marked equity by sleeve', 'timeseries', 0, 7, 12, 8, [('mfd_fixture_latest_equity_usd', '{{scope}}')], 'Latest completed artificial run sampled over wall clock. Each step reflects a new scenario; this is not a backtest equity curve.', 'currencyUSD', 2),
+    row(101, 'How scenario marks and decisions changed between runs', 6),
+    panel(5, 'Marked equity by sleeve', 'timeseries', 0, 7, 12, 8, [('mfd_fixture_latest_equity_usd', '{{scope}}')], 'Latest completed scenario sampled over wall clock. Each step reflects a new scenario; this is not a backtest equity curve.', 'currencyUSD', 2),
     panel(6, 'Unrealized mark to cost by sleeve', 'timeseries', 12, 7, 12, 8, [('mfd_fixture_latest_unrealized_pnl_usd', '{{scope}}')], 'Fixed holdings marked with the latest scenario quotes; no trades or fees.', 'currencyUSD', 2),
     panel(7, 'Decision actions in latest run', 'timeseries', 0, 15, 12, 8, [('mfd_fixture_latest_decisions', '{{action}}')], 'HOLD and REVIEW are durable decision records, not orders.', 'short', 0),
     panel(8, 'Durable run counts', 'timeseries', 12, 15, 12, 8, [('mfd_runs', '{{status}}')], 'Lifetime count by status in PostgreSQL.', 'short', 0),
-    note(102, 'Read the underlying evidence', 23, 'All portfolio values here are **artificial fixture results**. Open the [mfd lab](https://mfd.aklein.fr) for the selected run, quote snapshots, exact decimal values, decision checks and scenario comparison. Prometheus shows aggregate signals; the lab holds the individual records.'),
+    note(102, 'Read the underlying evidence', 23, 'These values use **simulated scenario prices**, separate from eToro account snapshots. Open the [mfd lab](https://mfd.aklein.fr) for the selected run, quote snapshots, exact decimal values, decision checks and scenario comparison. Prometheus shows aggregate signals; the lab holds the individual records.'),
 ]
 lab[1]['fieldConfig']['defaults']['color'] = {'mode': 'fixed', 'fixedColor': 'green'}
 lab[2]['fieldConfig']['defaults']['thresholds'] = {'mode': 'absolute', 'steps': [{'color': 'red', 'value': None}, {'color': 'green', 'value': 0}]}

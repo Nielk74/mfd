@@ -130,7 +130,7 @@ func (p *Platform) productMetrics(ctx context.Context) (string, error) {
 		latest[snap.Sleeve] = snap
 	}
 	var b strings.Builder
-	b.WriteString("# HELP mfd_fixture_latest_equity_usd Latest completed artificial experiment equity in USD.\n# TYPE mfd_fixture_latest_equity_usd gauge\n")
+	b.WriteString("# HELP mfd_fixture_latest_equity_usd Latest completed scenario equity in USD.\n# TYPE mfd_fixture_latest_equity_usd gauge\n")
 	totalEquity, totalPnL := 0.0, 0.0
 	for _, sleeve := range []string{"core", "experiment"} {
 		if s, ok := latest[sleeve]; ok {
@@ -142,7 +142,7 @@ func (p *Platform) productMetrics(ctx context.Context) (string, error) {
 		}
 	}
 	fmt.Fprintf(&b, "mfd_fixture_latest_equity_usd{scope=\"total\"} %g\n", totalEquity)
-	b.WriteString("# HELP mfd_fixture_latest_unrealized_pnl_usd Latest completed artificial experiment mark to cost.\n# TYPE mfd_fixture_latest_unrealized_pnl_usd gauge\n")
+	b.WriteString("# HELP mfd_fixture_latest_unrealized_pnl_usd Latest completed scenario mark to cost.\n# TYPE mfd_fixture_latest_unrealized_pnl_usd gauge\n")
 	for _, sleeve := range []string{"core", "experiment"} {
 		if s, ok := latest[sleeve]; ok {
 			pnl, _ := s.UnrealizedPnL.Float64()
@@ -156,7 +156,7 @@ func (p *Platform) productMetrics(ctx context.Context) (string, error) {
 			counts[d.Action]++
 		}
 	}
-	b.WriteString("# HELP mfd_fixture_latest_decisions Latest completed artificial experiment decisions.\n# TYPE mfd_fixture_latest_decisions gauge\n")
+	b.WriteString("# HELP mfd_fixture_latest_decisions Latest completed scenario decisions.\n# TYPE mfd_fixture_latest_decisions gauge\n")
 	for _, action := range []string{"hold", "review"} {
 		fmt.Fprintf(&b, "mfd_fixture_latest_decisions{action=%q} %d\n", action, counts[action])
 	}

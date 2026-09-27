@@ -2,7 +2,7 @@
   "uid": "mfd-lab",
   "title": "mfd / Portfolio & decisions",
   "schemaVersion": 41,
-  "version": 5,
+  "version": 6,
   "refresh": "10s",
   "time": {
     "from": "now-1h",
@@ -31,7 +31,7 @@
   "panels": [
     {
       "id": 100,
-      "title": "Current artificial experiment \u00b7 latest completed run",
+      "title": "Current research scenario \u00b7 latest completed run",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -46,7 +46,7 @@
       "id": 1,
       "title": "Final marked equity",
       "type": "stat",
-      "description": "USD midpoint value of fixed holdings at the last artificial observation. No realized strategy return.",
+      "description": "USD midpoint value of fixed holdings at the last simulated scenario price. No realized strategy return.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
@@ -95,7 +95,7 @@
       "id": 2,
       "title": "Unrealized P&L",
       "type": "stat",
-      "description": "Artificial mark minus fixed position cost. Excludes trading, fees and cash flows.",
+      "description": "Scenario mark minus fixed position cost. Excludes trading, fees and cash flows.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
@@ -241,7 +241,7 @@
     },
     {
       "id": 101,
-      "title": "How artificial marks and decisions changed between runs",
+      "title": "How scenario marks and decisions changed between runs",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -256,7 +256,7 @@
       "id": 5,
       "title": "Marked equity by sleeve",
       "type": "timeseries",
-      "description": "Latest completed artificial run sampled over wall clock. Each step reflects a new scenario; this is not a backtest equity curve.",
+      "description": "Latest completed scenario sampled over wall clock. Each step reflects a new scenario; this is not a backtest equity curve.",
       "datasource": {
         "type": "prometheus",
         "uid": "mfd-prometheus"
@@ -420,7 +420,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "All portfolio values here are **artificial fixture results**. Open the [mfd lab](https://mfd.aklein.fr) for the selected run, quote snapshots, exact decimal values, decision checks and scenario comparison. Prometheus shows aggregate signals; the lab holds the individual records."
+        "content": "These values use **simulated scenario prices**, separate from eToro account snapshots. Open the [mfd lab](https://mfd.aklein.fr) for the selected run, quote snapshots, exact decimal values, decision checks and scenario comparison. Prometheus shows aggregate signals; the lab holds the individual records."
       }
     }
   ]

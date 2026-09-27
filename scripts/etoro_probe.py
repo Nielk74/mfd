@@ -35,6 +35,13 @@ def probe(label, path, api_key, user_key):
             payload = json.load(response)
             result = {"endpoint": label, "http_status": response.status,
                       "shape": type(payload).__name__, "account_values_omitted": True}
+            if "aggregate-portfolio" in label:
+                result["schema_valid"] = (isinstance(payload, dict)
+                    and isinstance(payload.get("timestamp"), str)
+                    and payload.get("accountCurrency") == "USD"
+                    and isinstance(payload.get("accountTotals"), dict)
+                    and isinstance(payload.get("instrumentAggregates"), list)
+                    and isinstance(payload.get("mirrors"), list))
             if isinstance(payload, dict) and isinstance(payload.get("isSucceeded"), bool):
                 result["provider_success"] = payload["isSucceeded"]
             return result
@@ -69,11 +76,12 @@ def main():
             continue
         results = [probe(*endpoint, api_key, user_key) for endpoint in ENDPOINTS]
         successful = [name.split("/")[0] for name in ("demo/aggregate-portfolio", "real/aggregate-portfolio")
-                      if any(result.get("endpoint") == name and result.get("http_status") == 200 for result in results)]
-        output.append({"configured_slot": slot, "confirmed_environment": successful[0] if len(successful) == 1 else "unknown",
+                      if any(result.get("endpoint") == name and result.get("http_status") == 200 and result.get("schema_valid") for result in results)]
+        confirmed = successful[0] if len(successful) == 1 else "unknown"
+        output.append({"configured_slot": slot, "confirmed_environment": confirmed, "key_matches_slot": confirmed == slot,
                        "results": results})
     print(json.dumps({"read_only": True, "keys": output}))
-    return 0 if all(item["confirmed_environment"] != "unknown" for item in output) else 1
+    return 0 if all(item["key_matches_slot"] for item in output) else 1
 
 
 if __name__ == "__main__":

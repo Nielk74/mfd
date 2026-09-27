@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: mfd fixture lab
+  title: mfd research lab
   version: 0.3.0
-  description: Artificial experiment lab with separate protected read-only eToro Demo and Real importers. Broker order and model execution are unavailable.
+  description: Research scenarios use simulated prices. Separate protected read-only eToro Demo and Real importers report provider account data; broker order and model execution are unavailable.
 servers:
   - url: https://mfd.aklein.fr
   - url: http://localhost:8088
@@ -10,7 +10,7 @@ paths:
   /api/v1/replays:
     post:
       operationId: createFixtureReplay
-      summary: Enqueue a durable artificial experiment
+      summary: Enqueue a durable research scenario
       parameters:
         - name: Idempotency-Key
           in: header
@@ -106,7 +106,7 @@ paths:
       security: [{operatorToken: []}]
       responses:
         '200':
-          description: Provider-reported values and instrument IDs for the selected environment, separate from artificial sleeves
+          description: Provider-reported values and instrument IDs for the selected environment, separate from scenario sleeves
           content:
             application/json:
               schema:
@@ -227,7 +227,7 @@ components:
     Experiment:
       type: object
       additionalProperties: false
-      description: Artificial final quote shock; omitted values default to the baseline. No holdings or orders change.
+      description: Simulated final price shock; omitted values default to the baseline. No holdings or orders change.
       properties:
         name: {type: string, maxLength: 60, default: Baseline}
         final_shock_bps:

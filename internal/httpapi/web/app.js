@@ -280,7 +280,7 @@ function renderComparison() {
   for (const [label, value] of [[current.experiment?.name || 'Selected', money(left.equity)], [comparison.experiment?.name || 'Other', money(right.equity)], ['Mark difference', money(left.equity - right.equity)], ['Review difference', String(left.reviews - right.reviews)]]) {
     const block = node('div'); block.append(node('span', label), node('strong', value)); grid.append(block);
   }
-  container.append(grid, node('p', 'Difference is caused by artificial quotes or a review threshold. It is not an investment return.', 'footnote'));
+  container.append(grid, node('p', 'The difference comes from scenario prices or the review threshold. It is not an investment return.', 'footnote'));
 }
 function renderDecisions() {
   const container = $('decisions'); container.replaceChildren();

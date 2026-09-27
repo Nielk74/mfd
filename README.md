@@ -2,11 +2,11 @@
 
 **metro finance dodo** — a Go lab for portfolios, strategies and traceable trading decisions.
 
-See what you own, what a strategy decided, and what actually happened. Humans and agents will use the same recorded operations. eToro is the only planned portfolio/execution provider. Its official Demo and Real portfolio read adapters are wired; the supplied key has confirmed Real read access.
+See what you own, what a strategy decided, and what actually happened. Humans and agents will use the same recorded operations. eToro is the only planned portfolio/execution provider. Its official Demo and Real portfolio read adapters are wired; the active key has confirmed Real read access, while Demo still needs a Demo-scoped key.
 
 ## Start
 
-Requires Docker with Compose. No API keys needed for the fixture lab.
+Requires Docker with Compose. No API keys needed to run research scenarios.
 
 ```sh
 docker compose up -d --build --wait
@@ -14,7 +14,7 @@ docker compose up -d --build --wait
 
 Open **http://localhost:8088**. Create a named experiment from a preset or set the final AAPL/MSFT quote shocks and review threshold. Each run goes through PostgreSQL → NATS → a bounded Go worker pool, calculates exact-decimal marks, and records six decisions across two virtual sleeves. Compare runs, inspect positions and decision inputs, export valuations, and open **Queues & database** to read the current pipeline. Results survive restarts. Redis holds a disposable run-result cache.
 
-The experiment data is artificial. Holdings stay fixed; only the last quote observation changes. This is an interactive research foundation, **not yet a backtester, paper broker or live trading system**. The eToro adapter makes separate official, read-only Demo and Real portfolio requests; a 403 never becomes a fabricated account value. No broker order or model call is made. See [delivery plan](docs/roadmap.md) for explicit milestones.
+Research scenarios use simulated prices and fixed holdings; only the last price observation changes. This is **not yet a backtester, paper broker or live trading system**. The eToro adapter makes separate official, read-only Demo and Real portfolio requests; a 403 never becomes a fabricated account value. No broker order or model call is made. See [delivery plan](docs/roadmap.md) for explicit milestones.
 
 ```sh
 make check       # Go race tests, vet and Compose validation; requires Go 1.27.1+
@@ -63,4 +63,4 @@ Follow the returned `status_url`. Reusing the same key and experiment returns th
 
 ## eToro connectivity check
 
-Set `ETORO_API_KEY` with either or both `ETORO_DEMO_USER_KEY` and `ETORO_REAL_USER_KEY` in a private environment. `python3 scripts/etoro_probe.py` checks the official Demo and Real aggregate endpoints and prints only status and shape. A successful, schema-valid read confirms the key's environment; if the key was placed in the other slot, the importer switches to the correct endpoint and labels the account accordingly. The supplied key is Real-scoped; a separate Demo + Read key is still needed for Demo snapshots. Successful raw responses are encrypted before PostgreSQL stores them. The eToro tab unlocks each account history with a separate operator token held only in tab memory. No account amounts enter Prometheus. Do not commit keys or broker responses. See [verification](docs/verification.md) for results.
+Set `ETORO_API_KEY` with either or both `ETORO_DEMO_USER_KEY` and `ETORO_REAL_USER_KEY` in a private environment. `python3 scripts/etoro_probe.py` checks the official Demo and Real aggregate endpoints and prints only status and shape; it exits nonzero if a key resolves to the wrong slot. A successful, schema-valid read confirms the key's environment; if misplaced, the importer switches endpoints and labels the account accordingly. Both user keys supplied so far resolve to Real, for different provider accounts. One remains inactive in private settings to avoid mixing account histories; a Demo + Read key is still needed for Demo snapshots. Successful raw responses are encrypted before PostgreSQL stores them. The eToro tab unlocks each account history with a separate operator token held only in tab memory. No account amounts enter Prometheus. Do not commit keys or broker responses. See [verification](docs/verification.md) for results.

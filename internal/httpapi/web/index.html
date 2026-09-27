@@ -18,25 +18,25 @@
         <button class="nav-button" data-view="systems">Queues &amp; database</button>
         <button class="nav-button" data-view="broker" id="broker-nav">eToro</button>
       </nav>
-      <span class="environment">FIXTURE RESEARCH</span><span id="account-environments" class="account-state">ACCOUNT READ: CHECKING</span>
+      <span class="environment">RESEARCH SCENARIOS</span><span id="account-environments" class="account-state">ACCOUNT READ: CHECKING</span>
     </header>
     <main id="main">
       <section class="hero">
         <div>
           <p class="eyebrow">PORTFOLIO RESEARCH / DECISION EVIDENCE</p>
           <h1>A clear record of every move.</h1>
-          <p>Shape an artificial market observation, run it through the same valuation path, and inspect every decision and input.</p>
+          <p>Test a market scenario, then inspect its valuations, decisions and inputs.</p>
         </div>
         <div class="hero-side">
           <span class="live-dot" aria-hidden="true"></span><span id="connection">Checking lab</span>
           <button id="hero-create" class="primary">New experiment <span aria-hidden="true">↗</span></button>
         </div>
       </section>
-      <div class="fixture-notice"><strong>Artificial data</strong><span>Two fixed virtual sleeves, three quote observations. Scenarios change the last quote only. These marks are not historical returns or broker account values. eToro account reads are separate; execution is disabled.</span></div>
+      <div class="scenario-notice"><strong>Research scenario</strong><span>Workspace prices are simulated, with fixed holdings across three observations. Scenario marks are separate from eToro account values and are not historical returns. Execution is disabled.</span></div>
       <p id="status" role="status" aria-live="polite" class="status-line">Loading workspace…</p>
 
       <div class="summary-grid" aria-label="Selected experiment summary">
-        <article class="summary-card"><span>Marked equity</span><strong id="equity">—</strong><small>USD · final artificial mark</small></article>
+        <article class="summary-card"><span>Marked equity</span><strong id="equity">—</strong><small>USD · final scenario mark</small></article>
         <article class="summary-card"><span>Unrealized P&amp;L</span><strong id="pnl">—</strong><small>Against fixed position cost</small></article>
         <article class="summary-card"><span>Review decisions</span><strong id="review-count">—</strong><small>Recorded, never executed</small></article>
         <article class="summary-card"><span>Queued jobs</span><strong id="queue-count">—</strong><small>PostgreSQL outbox + NATS</small></article>
@@ -46,7 +46,7 @@
         <div class="work-grid">
           <section class="surface composer" id="composer">
             <div class="section-heading"><div><p class="eyebrow">CREATE / EXPERIMENT</p><h2>Test an idea</h2></div><span class="round-icon">↗</span></div>
-            <p class="section-copy">Adjust the final artificial quotes and review threshold. Holdings and cash stay fixed.</p>
+            <p class="section-copy">Adjust the final scenario prices and review threshold. Holdings and cash stay fixed.</p>
             <div class="presets" aria-label="Experiment presets">
               <button class="chip selected" data-preset="baseline">Baseline</button>
               <button class="chip" data-preset="dip">Tech dip</button>
@@ -77,8 +77,8 @@
           <div id="result" hidden>
             <div class="selected-facts"><span id="scenario-fact">—</span><span id="threshold-fact">—</span><span id="run-clock">—</span></div>
             <div class="chart-grid">
-              <section class="inner-panel"><div class="section-heading"><div><h3>Marked equity</h3><p class="muted">Three artificial observations · USD</p></div><span class="small-tag">FIXTURE CLOCK</span></div><div id="equity-chart" class="chart" role="img" aria-label="Equity over fixture observations"></div><div id="chart-legend" class="chart-legend"></div></section>
-              <section class="inner-panel compare-panel"><div class="section-heading"><div><h3>Compare experiments</h3><p class="muted">Same holdings and fixture; changed assumptions</p></div></div><label>Compare selected run with<select id="compare-select"><option value="">Choose a completed run</option></select></label><div id="comparison" class="comparison"><p class="empty">Select another run to see the final mark and decision difference.</p></div></section>
+              <section class="inner-panel"><div class="section-heading"><div><h3>Marked equity</h3><p class="muted">Three scenario observations · USD</p></div><span class="small-tag">SCENARIO CLOCK</span></div><div id="equity-chart" class="chart" role="img" aria-label="Equity over scenario observations"></div><div id="chart-legend" class="chart-legend"></div></section>
+              <section class="inner-panel compare-panel"><div class="section-heading"><div><h3>Compare experiments</h3><p class="muted">Same holdings; changed assumptions</p></div></div><label>Compare selected run with<select id="compare-select"><option value="">Choose a completed run</option></select></label><div id="comparison" class="comparison"><p class="empty">Select another run to see the final mark and decision difference.</p></div></section>
             </div>
             <div class="section-heading block-heading"><div><h3>Virtual sleeves</h3><p class="muted">Fixed positions · final observation</p></div><span class="small-tag">USD</span></div>
             <div id="sleeves" class="sleeve-grid"></div>
@@ -113,9 +113,9 @@
           <section class="surface"><div class="section-heading"><div><p class="eyebrow">ACCESS / LAST CHECK</p><h3 id="broker-connection-heading">Demo connection</h3></div></div><div class="ops-metrics"><div><span>Portfolio read</span><strong id="broker-result">—</strong></div><div><span>HTTP status</span><strong id="broker-http">—</strong></div><div><span>Last attempt</span><strong id="broker-attempt" class="small-value">—</strong></div><div><span>Snapshots saved</span><strong id="broker-snapshots">—</strong></div></div><p class="footnote">The endpoint follows the confirmed key environment. Denied and malformed reads never become account valuations.</p></section>
           <section class="surface"><div class="section-heading"><div><p class="eyebrow">OPERATOR / PRIVATE</p><h3>Inspect account history</h3></div></div><p class="section-copy">Use the operator token from this machine’s private deployment settings. It stays in this browser tab’s memory.</p><label>Operator token<input id="operator-token" type="password" autocomplete="off" placeholder="Paste token to unlock account view" /></label><div class="broker-actions"><button id="broker-unlock" class="primary">Unlock account view</button><button id="broker-sync" class="secondary" disabled>Sync selected account</button></div><p id="broker-message" class="muted">Portfolio values are hidden until unlocked.</p></section>
         </div>
-        <section id="broker-history" class="surface broker-history" hidden><div class="section-heading"><div><p class="eyebrow">ACCOUNT / OBSERVED SNAPSHOTS</p><h3 id="broker-history-title">Demo portfolio over time</h3></div><span id="broker-count" class="count">0</span></div><div id="broker-chart" class="chart" role="img" aria-label="Observed account totals"></div><div id="broker-records" class="table-scroll"></div><p class="footnote">Provider-reported values for the selected account environment, separate from artificial sleeves. Raw responses are encrypted before storage.</p></section>
+        <section id="broker-history" class="surface broker-history" hidden><div class="section-heading"><div><p class="eyebrow">ACCOUNT / OBSERVED SNAPSHOTS</p><h3 id="broker-history-title">Demo portfolio over time</h3></div><span id="broker-count" class="count">0</span></div><div id="broker-chart" class="chart" role="img" aria-label="Observed account totals"></div><div id="broker-records" class="table-scroll"></div><p class="footnote">Provider-reported values for the selected account environment, separate from research scenarios. Raw responses are encrypted before storage.</p></section>
       </section>
-      <footer><span id="health">Dependencies: checking</span><span id="revision">Build: checking</span><span>Fixture views use artificial data · eToro account view is separate</span></footer>
+      <footer><span id="health">Dependencies: checking</span><span id="revision">Build: checking</span><span>Scenario results and eToro account snapshots are separate</span></footer>
     </main>
   </body>
 </html>
