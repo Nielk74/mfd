@@ -351,17 +351,28 @@ func (c *Client) SubmitDemoLimitIOC(ctx context.Context, requestID string, instr
 }
 
 func (c *Client) LookupDemoOrder(ctx context.Context, referenceID string) ([]byte, int, OrderLookup, error) {
-	raw, status, err := c.request(ctx, http.MethodGet, DemoOrderLookupPath+"?referenceId="+url.QueryEscape(referenceID), "", nil)
+	return c.lookupDemoOrder(ctx, "referenceId="+url.QueryEscape(referenceID))
+}
+
+func (c *Client) LookupDemoOrderByID(ctx context.Context, orderID int64) ([]byte, int, OrderLookup, error) {
+	if orderID <= 0 {
+		return nil, 0, OrderLookup{}, errors.New("broker order ID is required")
+	}
+	return c.lookupDemoOrder(ctx, "orderId="+strconv.FormatInt(orderID, 10))
+}
+
+func (c *Client) lookupDemoOrder(ctx context.Context, query string) ([]byte, int, OrderLookup, error) {
+	raw, status, err := c.request(ctx, http.MethodGet, DemoOrderLookupPath+"?"+query, "", nil)
 	if err != nil {
 		return raw, status, OrderLookup{}, err
 	}
 	var data struct {
 		OrderID int64 `json:"orderId"`
 		Status  struct {
-			ID           int    `json:"id"`
-			Name         string `json:"name"`
-			ErrorCode    string `json:"errorCode"`
-			ErrorMessage string `json:"errorMessage"`
+			ID           int             `json:"id"`
+			Name         string          `json:"name"`
+			ErrorCode    json.RawMessage `json:"errorCode"`
+			ErrorMessage string          `json:"errorMessage"`
 		} `json:"status"`
 		Executions []struct {
 			PositionID int64 `json:"positionId"`
@@ -370,7 +381,17 @@ func (c *Client) LookupDemoOrder(ctx context.Context, referenceID string) ([]byt
 	if err := decode(raw, &data); err != nil || data.OrderID <= 0 || data.Status.ID <= 0 {
 		return raw, status, OrderLookup{}, &SchemaError{}
 	}
-	out := OrderLookup{OrderID: data.OrderID, StatusID: data.Status.ID, StatusName: data.Status.Name, ErrorCode: data.Status.ErrorCode, ErrorMessage: data.Status.ErrorMessage, PositionIDs: []int64{}}
+	code := ""
+	if len(data.Status.ErrorCode) > 0 && string(data.Status.ErrorCode) != "null" {
+		if err := json.Unmarshal(data.Status.ErrorCode, &code); err != nil {
+			var numeric json.Number
+			if err := json.Unmarshal(data.Status.ErrorCode, &numeric); err != nil {
+				return raw, status, OrderLookup{}, &SchemaError{}
+			}
+			code = numeric.String()
+		}
+	}
+	out := OrderLookup{OrderID: data.OrderID, StatusID: data.Status.ID, StatusName: data.Status.Name, ErrorCode: code, ErrorMessage: data.Status.ErrorMessage, PositionIDs: []int64{}}
 	for _, execution := range data.Executions {
 		if execution.PositionID > 0 {
 			out.PositionIDs = append(out.PositionIDs, execution.PositionID)

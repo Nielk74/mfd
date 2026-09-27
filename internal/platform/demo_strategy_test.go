@@ -108,3 +108,33 @@ func TestBrokerStatusNeverTreatsAcceptanceAsFill(t *testing.T) {
 		}
 	}
 }
+
+func TestDemoLookupFallsBackToKnownOrderID(t *testing.T) {
+	const requestID = "11111111-2222-4333-8444-555555555555"
+	orderID := int64(42)
+	var queries []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.URL.RawQuery)
+		if r.URL.Path != etoro.DemoOrderLookupPath {
+			t.Errorf("unexpected lookup path %s", r.URL.Path)
+		}
+		switch r.URL.Query().Get("referenceId") {
+		case requestID:
+			http.NotFound(w, r)
+		default:
+			if r.URL.Query().Get("orderId") != "42" {
+				t.Errorf("unexpected lookup query %s", r.URL.RawQuery)
+			}
+			_, _ = w.Write([]byte(`{"orderId":42,"status":{"id":4,"name":"Rejected","errorCode":2039,"errorMessage":"Synthetic rejection"},"positionExecutions":[]}`))
+		}
+	}))
+	defer server.Close()
+	client := &etoro.Client{BaseURL: server.URL, APIKey: "synthetic-app", UserKey: "synthetic-demo", HTTP: server.Client()}
+	_, httpStatus, lookup, byOrderID, err := lookupDemoOrderWithFallback(context.Background(), client, requestID, &orderID)
+	if err != nil || httpStatus != 200 || !byOrderID || lookup.OrderID != orderID || lookup.StatusID != 4 || lookup.ErrorCode != "2039" || len(queries) != 2 {
+		t.Fatalf("fallback result: status=%d, lookup=%+v, byOrderID=%t, queries=%v, err=%v", httpStatus, lookup, byOrderID, queries, err)
+	}
+	if state, _ := demoLookupState(lookup); state != "rejected" {
+		t.Fatalf("lookup state = %s, want rejected", state)
+	}
+}

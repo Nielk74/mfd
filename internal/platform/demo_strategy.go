@@ -508,12 +508,26 @@ func demoLookupState(lookup etoro.OrderLookup) (string, string) {
 		if len(lookup.PositionIDs) > 0 {
 			return "unknown", "Broker reported rejection with position executions; manual reconciliation required."
 		}
-		return "rejected", "Broker lookup confirmed the Demo order was rejected."
+		reason := "Broker lookup confirmed the Demo order was rejected."
+		if lookup.ErrorCode != "" && lookup.ErrorCode != "0" {
+			reason += " eToro error code: " + lookup.ErrorCode + "."
+		}
+		return "rejected", reason
 	case 1, 2, 11, 12:
 		return "accepted", "Broker lookup shows the Demo order is still in flight."
 	default:
 		return "unknown", "Broker returned an unrecognized order status; manual reconciliation required."
 	}
+}
+
+func lookupDemoOrderWithFallback(ctx context.Context, client *etoro.Client, referenceID string, brokerOrderID *int64) ([]byte, int, etoro.OrderLookup, bool, error) {
+	raw, httpStatus, lookup, err := client.LookupDemoOrder(ctx, referenceID)
+	var apiErr *etoro.APIError
+	if err != nil && brokerOrderID != nil && errors.As(err, &apiErr) && apiErr.Status == 404 {
+		raw, httpStatus, lookup, err = client.LookupDemoOrderByID(ctx, *brokerOrderID)
+		return raw, httpStatus, lookup, true, err
+	}
+	return raw, httpStatus, lookup, false, err
 }
 
 func (b *BrokerService) DemoReconcile(ctx context.Context, id string) (DemoStrategyRun, error) {
@@ -534,7 +548,7 @@ func (b *BrokerService) DemoReconcile(ctx context.Context, id string) (DemoStrat
 		return run, nil
 	}
 	lookupCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	raw, httpStatus, lookup, lookupErr := client.LookupDemoOrder(lookupCtx, id)
+	raw, httpStatus, lookup, lookupByOrderID, lookupErr := lookupDemoOrderWithFallback(lookupCtx, client, id, run.BrokerOrderID)
 	cancel()
 	if lookupErr != nil {
 		if run.Status == "submitting" {
@@ -560,7 +574,11 @@ func (b *BrokerService) DemoReconcile(ctx context.Context, id string) (DemoStrat
 	if err = b.saveArtifacts(ctx, tx, id, "lookup", []demoArtifact{{Source: etoro.DemoOrderLookupPath, Raw: raw}}); err != nil {
 		return DemoStrategyRun{}, err
 	}
-	if err = addDemoEvent(ctx, tx, id, "broker_lookup", reason, httpStatus); err != nil {
+	eventReason := reason
+	if lookupByOrderID {
+		eventReason = "Reference lookup returned 404; order-ID lookup resolved the broker state. " + reason
+	}
+	if err = addDemoEvent(ctx, tx, id, "broker_lookup", eventReason, httpStatus); err != nil {
 		return DemoStrategyRun{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
