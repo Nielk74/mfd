@@ -1,6 +1,6 @@
 # Portfolio and decision model
 
-This is the target domain design. The foundation only replays fixed unlevered USD fixture holdings and records valuations/decisions; it does not implement the journal below yet.
+This is the target domain design. The fixture foundation replays fixed unlevered USD holdings and records valuations/decisions. A separate narrow Demo BTC probe now records a provider-backed decision, intent and broker order state; it does not implement the balanced journal or general strategy engine below yet.
 
 ## Accounts, sleeves and simulations
 

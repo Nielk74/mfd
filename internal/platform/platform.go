@@ -172,6 +172,64 @@ func (p *Platform) migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_version WHERE version=5)").Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		if _, err = tx.Exec(ctx, `CREATE TABLE demo_strategy_runs (
+			id uuid PRIMARY KEY,
+			idempotency_key text NOT NULL UNIQUE,
+			strategy_version text NOT NULL,
+			actor text NOT NULL,
+			status text NOT NULL CHECK (status IN ('hold','ready','submitting','accepted','filled','partially_filled','rejected','unknown')),
+			reason text NOT NULL,
+			created_at timestamptz NOT NULL DEFAULT now(),
+			updated_at timestamptz NOT NULL DEFAULT now(),
+			expires_at timestamptz,
+			plan jsonb,
+			checks jsonb NOT NULL,
+			request_id uuid,
+			broker_order_id bigint,
+			broker_status_id integer,
+			broker_position_ids bigint[] NOT NULL DEFAULT '{}'
+		)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE INDEX demo_strategy_recent ON demo_strategy_runs(created_at DESC)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE UNIQUE INDEX demo_strategy_one_active ON demo_strategy_runs ((true)) WHERE status IN ('submitting','accepted','unknown','partially_filled')`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE TABLE demo_strategy_events (
+			id uuid PRIMARY KEY,
+			run_id uuid NOT NULL REFERENCES demo_strategy_runs(id),
+			at timestamptz NOT NULL DEFAULT now(),
+			kind text NOT NULL,
+			summary text NOT NULL,
+			http_status integer NOT NULL DEFAULT 0
+		)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE INDEX demo_strategy_events_recent ON demo_strategy_events(run_id,at)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `CREATE TABLE demo_strategy_artifacts (
+			id uuid PRIMARY KEY,
+			run_id uuid NOT NULL REFERENCES demo_strategy_runs(id),
+			captured_at timestamptz NOT NULL DEFAULT now(),
+			phase text NOT NULL,
+			source text NOT NULL,
+			response_sha256 text NOT NULL,
+			nonce bytea NOT NULL,
+			ciphertext bytea NOT NULL
+		)`); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, "INSERT INTO schema_version VALUES(5)"); err != nil {
+			return err
+		}
+	}
 	return tx.Commit(ctx)
 }
 func newID() string {

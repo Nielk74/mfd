@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: mfd research lab
-  version: 0.3.0
-  description: Research scenarios use simulated prices. Separate protected read-only eToro Demo and Real importers report provider account data; broker order and model execution are unavailable.
+  version: 0.4.0
+  description: Research scenarios use simulated prices. Protected eToro Demo and Real imports are separate. One fixed, operator-token-protected Demo BTC order test is available only when privately enabled; Real order execution is absent.
 servers:
   - url: https://mfd.aklein.fr
   - url: http://localhost:8088
@@ -138,6 +138,70 @@ paths:
         '401': {description: Operator token required}
         '400': {description: Invalid environment}
         '503': {description: Local storage unavailable}
+  /api/v1/etoro/demo/strategies:
+    get:
+      operationId: listDemoStrategyDecisions
+      summary: Latest 30 private Demo probe decisions and broker states
+      security: [{operatorToken: []}]
+      responses:
+        '200':
+          description: Durable Demo decision history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs, limit]
+                properties:
+                  limit: {type: integer, const: 30}
+                  runs: {type: array, items: {$ref: '#/components/schemas/DemoStrategyRun'}}
+        '401': {description: Operator token required}
+  /api/v1/etoro/demo/strategies/preview:
+    post:
+      operationId: previewDemoBTCProbe
+      summary: Evaluate and durably record PASS or HOLD for the fixed $100 Demo BTC strategy
+      description: No broker order is sent. The idempotency key returns the same decision on retry. A ready plan expires after 60 seconds.
+      security: [{operatorToken: []}]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, pattern: '^[a-zA-Z0-9_-]{8,100}$'}
+      responses:
+        '200': {description: Reviewed plan or HOLD with checks, content: {application/json: {schema: {$ref: '#/components/schemas/DemoStrategyRun'}}}}
+        '400': {description: Invalid idempotency key}
+        '401': {description: Operator token required}
+  /api/v1/etoro/demo/strategies/{id}:
+    get:
+      operationId: getDemoStrategyDecision
+      summary: A Demo decision with activity history
+      security: [{operatorToken: []}]
+      parameters: [{$ref: '#/components/parameters/DemoDecisionID'}]
+      responses:
+        '200': {description: Decision and broker state, content: {application/json: {schema: {$ref: '#/components/schemas/DemoStrategyRun'}}}}
+        '401': {description: Operator token required}
+        '404': {description: Decision not found}
+  /api/v1/etoro/demo/strategies/{id}/execute:
+    post:
+      operationId: executeDemoBTCProbe
+      summary: Recheck and submit one reviewed Demo limitIOC order
+      description: Persists the intent before submission. A response from eToro is not treated as a fill; lookup by request ID resolves the final state. Never retries an ambiguous submission.
+      security: [{operatorToken: []}]
+      parameters: [{$ref: '#/components/parameters/DemoDecisionID'}]
+      responses:
+        '200': {description: Current decision and broker state, content: {application/json: {schema: {$ref: '#/components/schemas/DemoStrategyRun'}}}}
+        '401': {description: Operator token required}
+        '404': {description: Decision not found}
+        '409': {description: Decision expired, not ready, or another intent unresolved}
+  /api/v1/etoro/demo/strategies/{id}/reconcile:
+    post:
+      operationId: reconcileDemoBTCProbe
+      summary: Query eToro by the original request ID without resubmitting
+      security: [{operatorToken: []}]
+      parameters: [{$ref: '#/components/parameters/DemoDecisionID'}]
+      responses:
+        '200': {description: Updated broker state, content: {application/json: {schema: {$ref: '#/components/schemas/DemoStrategyRun'}}}}
+        '401': {description: Operator token required}
+        '404': {description: Decision not found}
   /healthz:
     get:
       operationId: liveness
@@ -157,6 +221,11 @@ paths:
         '503': {description: Database metrics unavailable}
 components:
   parameters:
+    DemoDecisionID:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
     BrokerEnvironment:
       name: environment
       in: query
@@ -173,7 +242,7 @@ components:
       required: [provider, execution_enabled, environments]
       properties:
         provider: {type: string, const: etoro}
-        execution_enabled: {type: boolean, const: false}
+        execution_enabled: {type: boolean, description: True only for the explicitly enabled Demo BTC probe; Real execution remains disabled}
         environments:
           type: object
           required: [demo, real]
@@ -192,7 +261,48 @@ components:
         http_status: {type: integer}
         last_success: {type: [string, 'null'], format: date-time}
         snapshot_count: {type: integer}
-        execution_enabled: {type: boolean, const: false}
+        execution_enabled: {type: boolean, description: Always false for Real; true for Demo only when the private switch is on and the latest read succeeded}
+    DemoStrategyRun:
+      type: object
+      required: [id, idempotency_key, strategy_version, actor, status, reason, created_at, updated_at, expires_at, plan, checks, broker_order_id, broker_status_id, broker_position_ids, events]
+      properties:
+        id: {type: string, format: uuid}
+        idempotency_key: {type: string}
+        strategy_version: {type: string, const: btc-liquidity-probe-v1}
+        actor: {type: string, const: operator-token}
+        status: {type: string, enum: [hold, ready, submitting, accepted, filled, partially_filled, rejected, unknown]}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        expires_at: {type: [string, 'null'], format: date-time}
+        plan:
+          oneOf:
+            - {$ref: '#/components/schemas/DemoPlan'}
+            - {type: 'null'}
+        checks: {type: array, items: {type: object, required: [name, passed, detail], properties: {name: {type: string}, passed: {type: boolean}, detail: {type: string}}}}
+        broker_order_id: {type: [integer, 'null']}
+        broker_status_id: {type: [integer, 'null']}
+        broker_position_ids: {type: array, items: {type: integer}}
+        events: {type: array, items: {type: object, required: [at, kind, summary, http_status], properties: {at: {type: string, format: date-time}, kind: {type: string}, summary: {type: string}, http_status: {type: integer}}}}
+    DemoPlan:
+      type: object
+      required: [symbol, account_fingerprint, instrument_id, amount_usd, order_type, settlement_type, leverage, bid, ask, limit_rate, spread_bps, quote_at, quote_time_assumed_utc, estimated_upfront_cost_usd, source_sha256]
+      properties:
+        symbol: {type: string, const: BTC}
+        account_fingerprint: {type: string, pattern: '^[0-9a-f]{64}$', description: HMAC of the Demo provider account ID; the raw ID is not exposed}
+        instrument_id: {type: integer}
+        amount_usd: {$ref: '#/components/schemas/Decimal'}
+        order_type: {type: string, const: limitIOC}
+        settlement_type: {type: string, const: real}
+        leverage: {type: integer, const: 1}
+        bid: {$ref: '#/components/schemas/Decimal'}
+        ask: {$ref: '#/components/schemas/Decimal'}
+        limit_rate: {$ref: '#/components/schemas/Decimal'}
+        spread_bps: {$ref: '#/components/schemas/Decimal'}
+        quote_at: {type: string, format: date-time}
+        quote_time_assumed_utc: {type: boolean}
+        estimated_upfront_cost_usd: {$ref: '#/components/schemas/Decimal'}
+        source_sha256: {type: object, additionalProperties: {type: string, pattern: '^[0-9a-f]{64}$'}}
     BrokerSnapshot:
       type: object
       required: [id, environment, fetched_at, source_sha256, portfolio]

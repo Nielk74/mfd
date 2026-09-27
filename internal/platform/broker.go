@@ -57,14 +57,15 @@ type BrokerSnapshot struct {
 
 // A slot is an operator hint. Only a successful aggregate read binds a key to Demo or Real.
 type BrokerService struct {
-	DB          *pgxpool.Pool
-	clients     map[string]*etoro.Client
-	bound       map[string]*etoro.Client
-	conflicted  map[*etoro.Client]bool
-	aead        cipher.AEAD
-	token       string
-	mu          sync.Mutex
-	lastAttempt map[*etoro.Client]time.Time
+	DB                   *pgxpool.Pool
+	clients              map[string]*etoro.Client
+	bound                map[string]*etoro.Client
+	conflicted           map[*etoro.Client]bool
+	aead                 cipher.AEAD
+	token                string
+	mu                   sync.Mutex
+	lastAttempt          map[*etoro.Client]time.Time
+	demoExecutionEnabled bool
 }
 
 func NewBrokerService(db *pgxpool.Pool, clients map[string]*etoro.Client, encodedKey, operatorToken string) (*BrokerService, error) {
@@ -96,6 +97,7 @@ func NewBrokerService(db *pgxpool.Pool, clients map[string]*etoro.Client, encode
 func (b *BrokerService) Authorized(token string) bool {
 	return token != "" && len(token) == len(b.token) && subtle.ConstantTimeCompare([]byte(token), []byte(b.token)) == 1
 }
+func (b *BrokerService) EnableDemoExecution(enabled bool) { b.demoExecutionEnabled = enabled }
 func (b *BrokerService) encrypt(raw []byte) ([]byte, []byte, error) {
 	nonce := make([]byte, b.aead.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
@@ -131,12 +133,13 @@ func (b *BrokerService) status(ctx context.Context, environment string) (BrokerS
 		out.LastResult = "not_configured"
 		out.HTTPStatus = 0
 	}
+	out.ExecutionEnabled = environment == "demo" && b.demoExecutionEnabled && b.bound["demo"] != nil && out.LastResult == "ok"
 	return out, nil
 }
 func (b *BrokerService) Status(ctx context.Context) (BrokerOverview, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	out := BrokerOverview{Provider: "etoro", ExecutionEnabled: false, Environments: map[string]BrokerStatus{}}
+	out := BrokerOverview{Provider: "etoro", Environments: map[string]BrokerStatus{}}
 	for _, environment := range brokerEnvironments {
 		status, err := b.status(ctx, environment)
 		if err != nil {
@@ -144,6 +147,7 @@ func (b *BrokerService) Status(ctx context.Context) (BrokerOverview, error) {
 		}
 		out.Environments[environment] = status
 	}
+	out.ExecutionEnabled = out.Environments["demo"].ExecutionEnabled
 	return out, nil
 }
 func classifyBrokerRead(err error) (string, int) {
@@ -291,14 +295,23 @@ func (b *BrokerService) History(ctx context.Context, environment string) ([]Brok
 }
 func (b *BrokerService) Run(ctx context.Context) {
 	b.syncConfigured(ctx)
-	ticker := time.NewTicker(30 * time.Minute)
-	defer ticker.Stop()
+	syncTicker := time.NewTicker(30 * time.Minute)
+	reconcileTicker := time.NewTicker(30 * time.Second)
+	defer syncTicker.Stop()
+	defer reconcileTicker.Stop()
+	if err := b.ReconcilePendingDemo(ctx); err != nil {
+		slog.Warn("Demo order reconciliation unavailable", "error", err)
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-syncTicker.C:
 			b.syncConfigured(ctx)
+		case <-reconcileTicker.C:
+			if err := b.ReconcilePendingDemo(ctx); err != nil {
+				slog.Warn("Demo order reconciliation unavailable", "error", err)
+			}
 		}
 	}
 }

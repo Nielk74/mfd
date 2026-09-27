@@ -2,7 +2,7 @@
 
 **metro finance dodo** — a Go lab for portfolios, strategies and traceable trading decisions.
 
-See what you own, what a strategy decided, and what actually happened. Humans and agents will use the same recorded operations. eToro is the only planned portfolio/execution provider. Its official Demo and Real portfolio read adapters are wired; a Demo-scoped key now imports account snapshots. The previously active Real key was revoked and currently returns 401.
+See what you own, what a strategy decided, and what actually happened. Humans and agents use the same recorded operations. eToro is the only portfolio/execution provider. Its official Demo and Real portfolio read adapters import separate account histories. A narrow, explicitly enabled Demo BTC order test records the decision, submission and broker lookup. Real order execution is absent. The previously active Real key was revoked and currently returns 401.
 
 ## Start
 
@@ -14,7 +14,7 @@ docker compose up -d --build --wait
 
 Open **http://localhost:8088**. Create a named experiment from a preset or set the final AAPL/MSFT quote shocks and review threshold. Each run goes through PostgreSQL → NATS → a bounded Go worker pool, calculates exact-decimal marks, and records six decisions across two virtual sleeves. Compare runs, inspect positions and decision inputs, export valuations, and open **Queues & database** to read the current pipeline. Results survive restarts. Redis holds a disposable run-result cache.
 
-Research scenarios use simulated prices and fixed holdings; only the last price observation changes. This is **not yet a backtester, paper broker or live trading system**. The eToro adapter makes separate official, read-only Demo and Real portfolio requests; a 403 never becomes a fabricated account value. No broker order or model call is made. See [delivery plan](docs/roadmap.md) for explicit milestones.
+Research scenarios use simulated prices and fixed holdings; only the last price observation changes. This is **not yet a backtester, paper broker or live trading system**. The separate eToro Demo probe uses live provider reads, a capped one-time order and broker lookup when privately enabled. A 403 never becomes a fabricated account value. No Real order or model call is made. See [delivery plan](docs/roadmap.md) for explicit milestones.
 
 ```sh
 make check       # Go race tests, vet and Compose validation; requires Go 1.27.1+
@@ -37,7 +37,7 @@ Hosted interfaces: [lab](https://mfd.aklein.fr), [Grafana](https://mfd-grafana.a
 | PostgreSQL | Durable runs, decisions and transactional outbox; future accounting ledger |
 | NATS JetStream | Persistent work queue and shared pull consumer |
 | Redis | Disposable cache; never the book of record |
-| eToro read adapter | Official Demo and Real aggregate portfolio reads, separate encrypted histories and visible access status |
+| eToro adapter | Official Demo and Real portfolio reads, separate encrypted histories; one guarded Demo order test with decision and broker status trail |
 | Prometheus / Grafana | Product and pipeline metrics, local alert rules, portfolio/decision and operations dashboards |
 
 Use Kafka when measured throughput, retention or integrations justify it. Start with a smaller queue. Keep broker account capital, attributed sleeves and independent simulations separate. Keep model judgments separate from deterministic arithmetic and authorization.
@@ -45,6 +45,7 @@ Use Kafka when measured throughput, retention or integrations justify it. Start 
 - [Research: eToro, Jev, QuantDinger and related engines](docs/research/2026-09-25-foundations.md)
 - [Architecture and data flow](docs/architecture.md)
 - [Portfolio accounting, decisions and strategy evaluation](docs/portfolio-and-decisions.md)
+- [Demo BTC liquidity probe](docs/demo-btc-probe.md)
 - [Infrastructure decision](docs/adr/0001-small-durable-core.md)
 - [Monitoring and recovery plan](docs/observability.md)
 - [Milestones and acceptance gates](docs/roadmap.md)
@@ -59,8 +60,10 @@ curl -sS http://localhost:8088/api/v1/replays \
   -d '{"name":"Tech dip","final_shock_bps":{"AAPL":-500,"MSFT":-1000},"review_threshold_bps":100}'
 ```
 
-Follow the returned `status_url`. Reusing the same key and experiment returns the same run; reusing it with changed inputs returns 409. `GET /api/v1/runs` lists the latest 50; `GET /api/v1/runs/{id}` returns input snapshots, checks and decisions. `GET /api/v1/operations` reads queue, database and recent-job state. `GET /api/v1/etoro/status` shows Demo and Real access without account values; operator-token protected sync and snapshot endpoints select `environment=demo|real` in the [HTTP contract](api/openapi.yaml). `/healthz`, `/readyz` and `/metrics` expose runtime state. Scoped agent tokens and an MCP wrapper are planned.
+Follow the returned `status_url`. Reusing the same key and experiment returns the same run; reusing it with changed inputs returns 409. `GET /api/v1/runs` lists the latest 50; `GET /api/v1/runs/{id}` returns input snapshots, checks and decisions. `GET /api/v1/operations` reads queue, database and recent-job state. `GET /api/v1/etoro/status` shows Demo and Real access without account values; operator-token protected sync and snapshot endpoints select `environment=demo|real` in the [HTTP contract](api/openapi.yaml). The same token protects Demo strategy preview, execute, lookup and history. `/healthz`, `/readyz` and `/metrics` expose runtime state. Scoped agent tokens and an MCP wrapper are planned.
 
 ## eToro connectivity check
 
-Set `ETORO_API_KEY` with either or both `ETORO_DEMO_USER_KEY` and `ETORO_REAL_USER_KEY` in a private environment. `python3 scripts/etoro_probe.py` checks the official Demo and Real aggregate endpoints and prints only status and top-level shape; it exits nonzero if a key resolves to the wrong slot. The importer validates the full account shape before binding a key to an environment and can relabel a misplaced key. A confirmed Demo key now produces encrypted snapshots. eToro's Demo timestamp omitted a timezone offset, so the importer interprets it as UTC and flags that assumption in the account API and lab. The configured Real key was revoked; its current reads return 401 until replaced. The eToro tab unlocks each account history with a separate operator token held only in tab memory. No account amounts enter Prometheus. Do not commit keys or broker responses. See [verification](docs/verification.md) for results.
+Set `ETORO_API_KEY` with either or both `ETORO_DEMO_USER_KEY` and `ETORO_REAL_USER_KEY` in a private environment. `python3 scripts/etoro_probe.py` checks the official Demo and Real aggregate endpoints and prints only status and top-level shape; it exits nonzero if a key resolves to the wrong slot. The importer validates the full account shape before binding a key to an environment and can relabel a misplaced key. A confirmed Demo key now produces encrypted snapshots. eToro's Demo timestamp omitted a timezone offset, so the importer interprets it as UTC and flags that assumption in the account API and lab. The configured Real key was revoked; its current reads return 401 until replaced. The eToro tab unlocks each account history with an operator token held only in tab memory. No account amounts enter Prometheus. Do not commit keys or broker responses. See [verification](docs/verification.md) for results.
+
+The Demo BTC probe requires a Demo key with **Read and Write** permission and private `MFD_DEMO_EXECUTION_ENABLED=true`. It previews a fixed $100 unlevered buy only if the account has no holdings or pending orders, available cash covers $500, the order is at most 1% of provider-reported value, a realtime quote is fresh with spread ≤50 bps, eligibility allows the trade, and estimated upfront costs are ≤$2. The order is immediate-or-cancel with a limit at most 0.2% above the observed ask. A ready preview expires after 60 seconds; execute rechecks provider state and persists the intent before one submission. Ambiguous submissions are reconciled by the original request ID and never retried automatically. Broker acceptance is distinct from a confirmed fill. This is a scoped connectivity test, not a general strategy engine or accounting ledger.

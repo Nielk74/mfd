@@ -12,7 +12,7 @@ Status: chosen direction for the lab. The runnable foundation is narrower; see [
 
 ## Deployment
 
-Start with a modular Go application and bounded background workers. Keep module boundaries clean without creating a fleet of microservices. The same image can later run API, importer, research worker or executor roles. The executor will be isolated before any broker write credential is introduced.
+Start with a modular Go application and bounded background workers. Keep module boundaries clean without creating a fleet of microservices. The same image can later run API, importer, research worker or executor roles. The general executor will be isolated before any Real broker write credential is introduced. The narrow Demo-only probe uses a separate private switch and hardcoded Demo endpoints.
 
 ```mermaid
 flowchart LR
@@ -36,7 +36,7 @@ flowchart LR
 
 PostgreSQL is authoritative. Redis can be emptied without losing decisions or money. NATS carries work and events; consumers acknowledge only after durable effects commit. Market history moves to compressed Parquet/object storage once measured retention justifies it; avoid adding another database now.
 
-The Compose baseline is one host, one replica per dependency, persistent volumes and ports bound to all host interfaces. The requested Mac deployment includes automatic updates and Caddy HTTPS for the web interfaces; see [deployment](deployment.md). The read-only eToro adapter polls the official Demo or Real aggregated portfolio endpoint separately from research scenarios. It confirms a key's environment through a schema-valid read, then stores snapshots and statuses by environment. Successful raw responses are encrypted in PostgreSQL; account values are returned only through an operator-token protected API. A denied or malformed response records a status without creating a snapshot. Real account access does not enable execution. It is a development topology, not high availability. Full authentication, tested restores and execution controls remain prerequisites for live trading.
+The Compose baseline is one host, one replica per dependency, persistent volumes and ports bound to all host interfaces. The requested Mac deployment includes automatic updates and Caddy HTTPS for the web interfaces; see [deployment](deployment.md). The eToro account adapter polls the official Demo or Real aggregated portfolio endpoint separately from research scenarios. It confirms a key's environment through a schema-valid read, then stores snapshots and statuses by environment. Successful raw responses are encrypted in PostgreSQL; account values are returned only through an operator-token protected API. A denied or malformed response records a status without creating a snapshot. The narrow Demo strategy preview reads account, pending orders, market rates, eligibility and costs; it records a HOLD or a 60-second reviewed plan. Submission persists an intent first, uses a unique broker request ID once, and polls the official Demo lookup path. Unknown outcomes freeze further submissions. Real account access does not enable execution. It is a development topology, not high availability. Full authentication, tested restores and execution controls remain prerequisites for live trading.
 
 ## Modules and contracts
 

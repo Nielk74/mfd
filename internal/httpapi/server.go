@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/Nielk74/mfd/internal/lab"
@@ -36,6 +37,11 @@ type Store interface {
 	BrokerAuthorized(string) bool
 	BrokerHistory(context.Context, string) ([]platform.BrokerSnapshot, error)
 	BrokerSync(context.Context, string) (platform.BrokerStatus, error)
+	DemoPreview(context.Context, string) (platform.DemoStrategyRun, error)
+	DemoExecute(context.Context, string) (platform.DemoStrategyRun, error)
+	DemoReconcile(context.Context, string) (platform.DemoStrategyRun, error)
+	DemoRuns(context.Context) ([]platform.DemoStrategyRun, error)
+	DemoRun(context.Context, string) (platform.DemoStrategyRun, error)
 	Ready(context.Context) map[string]bool
 	Metrics(context.Context) (string, error)
 }
@@ -140,6 +146,97 @@ func New(p Store) http.Handler {
 		}
 		write(w, 200, status)
 	})
+	mux.HandleFunc("GET /api/v1/etoro/demo/strategies", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		runs, err := p.DemoRuns(r.Context())
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, map[string]any{"runs": runs, "limit": 30})
+	})
+	mux.HandleFunc("POST /api/v1/etoro/demo/strategies/preview", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		key := r.Header.Get("Idempotency-Key")
+		if !keyPattern.MatchString(key) {
+			write(w, 400, map[string]string{"error": "idempotency_key_required"})
+			return
+		}
+		run, err := p.DemoPreview(r.Context(), key)
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, run)
+	})
+	mux.HandleFunc("GET /api/v1/etoro/demo/strategies/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		id := r.PathValue("id")
+		if !idPattern.MatchString(id) {
+			write(w, 400, map[string]string{"error": "invalid_decision_id"})
+			return
+		}
+		run, err := p.DemoRun(r.Context(), id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			write(w, 404, map[string]string{"error": "decision_not_found"})
+			return
+		}
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, run)
+	})
+	mux.HandleFunc("POST /api/v1/etoro/demo/strategies/{id}/execute", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		id := r.PathValue("id")
+		if !idPattern.MatchString(id) {
+			write(w, 400, map[string]string{"error": "invalid_decision_id"})
+			return
+		}
+		run, err := p.DemoExecute(r.Context(), id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			write(w, 404, map[string]string{"error": "decision_not_found"})
+			return
+		}
+		if errors.Is(err, platform.ErrDemoIntentNotReady) || errors.Is(err, platform.ErrDemoActiveIntent) {
+			write(w, 409, map[string]string{"error": "demo_order_blocked", "detail": err.Error()})
+			return
+		}
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, run)
+	})
+	mux.HandleFunc("POST /api/v1/etoro/demo/strategies/{id}/reconcile", func(w http.ResponseWriter, r *http.Request) {
+		if !operator(w, r) {
+			return
+		}
+		id := r.PathValue("id")
+		if !idPattern.MatchString(id) {
+			write(w, 400, map[string]string{"error": "invalid_decision_id"})
+			return
+		}
+		run, err := p.DemoReconcile(r.Context(), id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			write(w, 404, map[string]string{"error": "decision_not_found"})
+			return
+		}
+		if err != nil {
+			failure(w, err)
+			return
+		}
+		write(w, 200, run)
+	})
 	mux.HandleFunc("GET /api/v1/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if !idPattern.MatchString(id) {
@@ -214,6 +311,10 @@ func New(p Store) http.Handler {
 		timeout := 10 * time.Second
 		if r.URL.Path == "/api/v1/etoro/sync" {
 			timeout = 55 * time.Second
+		} else if r.URL.Path == "/api/v1/etoro/demo/strategies/preview" || strings.HasSuffix(r.URL.Path, "/execute") {
+			timeout = 85 * time.Second
+		} else if strings.HasSuffix(r.URL.Path, "/reconcile") {
+			timeout = 35 * time.Second
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()

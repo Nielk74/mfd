@@ -103,7 +103,7 @@
         <div class="observability-links"><a href="https://mfd-grafana.aklein.fr/d/mfd-lab" target="_blank" rel="noopener">Open Grafana dashboard ↗</a><a href="https://mfd-prometheus.aklein.fr" target="_blank" rel="noopener">Explore Prometheus ↗</a></div>
       </section>
       <section id="broker-view" class="view" aria-label="eToro accounts" hidden>
-        <div class="page-heading"><div><p class="eyebrow">PROVIDER / ACCOUNT OBSERVATION</p><h2>eToro accounts</h2><p>Official portfolio reads. Demo and Real stay separate; orders are disabled.</p></div><span id="broker-badge" class="small-tag">CHECKING</span></div>
+        <div class="page-heading"><div><p class="eyebrow">PROVIDER / ACCOUNT OBSERVATION</p><h2>eToro accounts</h2><p>Official portfolio reads. One capped Demo order test is available when privately enabled; Real orders remain disabled.</p></div><span id="broker-badge" class="small-tag">CHECKING</span></div>
         <div class="broker-environment-grid" aria-label="eToro environments">
           <button id="broker-demo" class="broker-environment" data-environment="demo" aria-pressed="true"><span class="broker-environment-name">DEMO ACCOUNT</span><strong id="broker-demo-result">Checking…</strong><small id="broker-demo-detail">Read-only · no orders</small></button>
           <button id="broker-real" class="broker-environment real" data-environment="real" aria-pressed="false"><span class="broker-environment-name">REAL ACCOUNT</span><strong id="broker-real-result">Checking…</strong><small id="broker-real-detail">Read-only · no orders</small></button>
@@ -114,6 +114,15 @@
           <section class="surface"><div class="section-heading"><div><p class="eyebrow">OPERATOR / PRIVATE</p><h3>Inspect account history</h3></div></div><p class="section-copy">Use the operator token from this machine’s private deployment settings. It stays in this browser tab’s memory.</p><label>Operator token<input id="operator-token" type="password" autocomplete="off" placeholder="Paste token to unlock account view" /></label><div class="broker-actions"><button id="broker-unlock" class="primary">Unlock account view</button><button id="broker-sync" class="secondary" disabled>Sync selected account</button></div><p id="broker-message" class="muted">Portfolio values are hidden until unlocked.</p></section>
         </div>
         <section id="broker-history" class="surface broker-history" hidden><div class="section-heading"><div><p class="eyebrow">ACCOUNT / OBSERVED SNAPSHOTS</p><h3 id="broker-history-title">Demo portfolio over time</h3></div><span id="broker-count" class="count">0</span></div><div id="broker-chart" class="chart" role="img" aria-label="Observed account totals"></div><div id="broker-records" class="table-scroll"></div><p class="footnote">Provider-reported values for the selected account environment, separate from research scenarios. Raw responses are encrypted before storage.</p></section>
+        <section id="demo-strategy-section" class="surface demo-strategy" aria-label="Demo strategy test">
+          <div class="section-heading"><div><p class="eyebrow">DEMO / DECISION TO BROKER</p><h3>BTC liquidity probe</h3></div><span id="demo-strategy-state" class="small-tag">LOCKED</span></div>
+          <p class="section-copy">A one-time $100 unlevered BTC buy. MFD checks the current Demo account, open orders, a realtime quote, spread, eligibility, and costs. It sets a buy limit no more than 0.2% above the observed ask and uses an immediate-or-cancel order. A preview records HOLD when a check fails. Submission and broker fill are tracked separately.</p>
+          <div class="demo-rule-grid"><div><span>Budget</span><strong>$100 USD</strong></div><div><span>Account cap</span><strong>1% of value</strong></div><div><span>Spread / cost caps</span><strong>50 bps / $2</strong></div><div><span>Order</span><strong>Demo · real BTC · 1×</strong></div></div>
+          <div class="broker-actions"><button id="demo-preview" class="secondary" disabled>Preview and record decision</button><button id="demo-execute" class="primary" disabled>Submit reviewed Demo order</button><button id="demo-reconcile" class="secondary" disabled>Check broker outcome</button></div>
+          <p id="demo-strategy-message" class="muted" role="status">Unlock the Demo account view to inspect decisions.</p>
+          <div id="demo-decision" class="demo-decision"></div>
+          <div class="demo-history"><h4>Decision history</h4><div id="demo-runs"><p class="empty">Unlock the account view to see recorded decisions.</p></div></div>
+        </section>
       </section>
       <footer><span id="health">Dependencies: checking</span><span id="revision">Build: checking</span><span>Scenario results and eToro account snapshots are separate</span></footer>
     </main>

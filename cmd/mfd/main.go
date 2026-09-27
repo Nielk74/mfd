@@ -76,6 +76,7 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		p.Broker.EnableDemoExecution(os.Getenv("MFD_DEMO_EXECUTION_ENABLED") == "true")
 	}
 	wait, err := p.Start(ctx, workers)
 	if err != nil {
@@ -89,7 +90,7 @@ func run() error {
 		go func() { defer brokerWorkers.Done(); p.Broker.Run(ctx) }()
 	}
 	defer func() { stop(); brokerWorkers.Wait() }()
-	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 65 * time.Second, IdleTimeout: 60 * time.Second}
+	server := &http.Server{Addr: env("MFD_ADDR", "0.0.0.0:8080"), Handler: httpapi.New(p), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 95 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan error, 1)
 	go func() {
 		slog.Info("lab ready", "address", server.Addr, "mode", "fixture", "workers", workers)

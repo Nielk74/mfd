@@ -36,6 +36,21 @@ func (s *stub) BrokerSync(ctx context.Context, environment string) (platform.Bro
 	s.syncDeadline, _ = ctx.Deadline()
 	return platform.BrokerStatus{Environment: environment}, nil
 }
+func (s *stub) DemoPreview(context.Context, string) (platform.DemoStrategyRun, error) {
+	return platform.DemoStrategyRun{Status: "hold"}, nil
+}
+func (s *stub) DemoExecute(context.Context, string) (platform.DemoStrategyRun, error) {
+	return platform.DemoStrategyRun{Status: "accepted"}, nil
+}
+func (s *stub) DemoReconcile(context.Context, string) (platform.DemoStrategyRun, error) {
+	return platform.DemoStrategyRun{Status: "filled"}, nil
+}
+func (s *stub) DemoRuns(context.Context) ([]platform.DemoStrategyRun, error) {
+	return []platform.DemoStrategyRun{}, nil
+}
+func (s *stub) DemoRun(context.Context, string) (platform.DemoStrategyRun, error) {
+	return platform.DemoStrategyRun{}, nil
+}
 func (s *stub) Ready(context.Context) map[string]bool   { return map[string]bool{"postgres": true} }
 func (s *stub) Metrics(context.Context) (string, error) { return "", nil }
 func TestReplayBoundary(t *testing.T) {
@@ -73,9 +88,9 @@ func TestReplayBoundary(t *testing.T) {
 	}
 }
 func TestBrokerAccountRequiresOperatorToken(t *testing.T) {
-	for _, path := range []string{"/api/v1/etoro/snapshots", "/api/v1/etoro/sync"} {
+	for _, path := range []string{"/api/v1/etoro/snapshots", "/api/v1/etoro/sync", "/api/v1/etoro/demo/strategies", "/api/v1/etoro/demo/strategies/preview", "/api/v1/etoro/demo/strategies/11111111-2222-4333-8444-555555555555/execute", "/api/v1/etoro/demo/strategies/11111111-2222-4333-8444-555555555555/reconcile"} {
 		method := http.MethodGet
-		if strings.HasSuffix(path, "/sync") {
+		if strings.HasSuffix(path, "/sync") || strings.HasSuffix(path, "/preview") || strings.HasSuffix(path, "/execute") || strings.HasSuffix(path, "/reconcile") {
 			method = http.MethodPost
 		}
 		w := httptest.NewRecorder()
@@ -83,6 +98,15 @@ func TestBrokerAccountRequiresOperatorToken(t *testing.T) {
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("%s returned %d", path, w.Code)
 		}
+	}
+}
+func TestRealOrderRouteDoesNotExist(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "http://localhost/api/v1/etoro/real/strategies/11111111-2222-4333-8444-555555555555/execute", nil)
+	r.Header.Set("X-MFD-Operator-Token", "test-operator-token")
+	w := httptest.NewRecorder()
+	New(&stub{}).ServeHTTP(w, r)
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("Real order route returned %d", w.Code)
 	}
 }
 func TestBrokerSyncAllowsProviderDeadline(t *testing.T) {

@@ -20,6 +20,7 @@ let runs = [], selected = null, current = null, comparison = null, pendingKey = 
 let activeView = 'workspace', renderedList = '', lastOperations = null;
 let operatorToken = '';
 let selectedBrokerEnvironment = 'demo', brokerStatuses = null, brokerSelectionTouched = false;
+let demoRuns = [], selectedDemoRun = null, demoPreviewKey = null, demoBusy = false;
 
 async function request(url, options) {
   const response = await fetch(url, options);
@@ -378,7 +379,7 @@ async function refreshBrokerStatus() {
       const status = brokerStatuses[environment];
       $(`broker-${environment}-result`).textContent = status.configured ? status.last_result.replaceAll('_', ' ') : 'Not configured';
       $(`broker-${environment}-detail`).textContent = status.configured
-        ? `HTTP ${status.http_status || '—'} · ${status.snapshot_count} saved · read only`
+        ? `HTTP ${status.http_status || '—'} · ${status.snapshot_count} saved · ${status.execution_enabled ? 'Demo order route armed' : 'read only'}`
         : 'No key confirmed · read only';
       $(`broker-${environment}`).setAttribute('aria-pressed', String(environment === selectedBrokerEnvironment));
       $(`broker-${environment}`).classList.toggle('connected', status.configured && status.last_result === 'ok');
@@ -387,10 +388,12 @@ async function refreshBrokerStatus() {
     $('broker-nav').textContent = real.configured && real.last_result === 'ok' ? 'eToro · REAL' : 'eToro';
     $('account-environments').textContent = real.configured && real.last_result === 'ok'
       ? 'REAL ACCOUNT READ · NO ORDERS' : demo.configured && demo.last_result === 'ok'
-        ? 'DEMO ACCOUNT READ · NO ORDERS' : 'ACCOUNT READ · UNAVAILABLE';
+        ? demo.execution_enabled ? 'DEMO ACCOUNT · ORDER ROUTE ARMED' : 'DEMO ACCOUNT READ · NO ORDERS' : 'ACCOUNT READ · UNAVAILABLE';
     const status = brokerStatuses[selectedBrokerEnvironment];
     const label = selectedBrokerEnvironment.toUpperCase();
-    $('broker-selected-banner').textContent = `${label} ACCOUNT · READ ONLY · EXECUTION DISABLED`;
+    $('broker-selected-banner').textContent = selectedBrokerEnvironment === 'demo' && status.execution_enabled
+      ? 'DEMO ACCOUNT · CAPPED ORDER ROUTE ARMED · WRITE SCOPE CHECKED AT SUBMISSION'
+      : `${label} ACCOUNT · READ ONLY · EXECUTION DISABLED`;
     $('broker-selected-banner').classList.toggle('real', selectedBrokerEnvironment === 'real');
     $('broker-connection-heading').textContent = `${selectedBrokerEnvironment === 'real' ? 'Real' : 'Demo'} connection`;
     $('broker-history-title').textContent = `${selectedBrokerEnvironment === 'real' ? 'Real' : 'Demo'} portfolio over time`;
@@ -402,6 +405,9 @@ async function refreshBrokerStatus() {
     $('broker-attempt').textContent = time(status.last_attempt);
     $('broker-snapshots').textContent = status.snapshot_count;
     $('broker-sync').disabled = !operatorToken || !status.configured;
+    $('demo-strategy-section').hidden = selectedBrokerEnvironment !== 'demo';
+    $('demo-strategy-state').textContent = demo.execution_enabled ? 'DEMO ARMED' : 'DEMO DISABLED';
+    updateDemoButtons();
     if (!status.configured) $('broker-message').textContent = `No ${label} key is confirmed. Add an eToro ${label} + Read user key to private settings.`;
     else if (status.last_result === 'ok') $('broker-message').textContent = operatorToken
       ? `Private ${label} account view unlocked for this tab.`
@@ -462,13 +468,18 @@ for (const button of document.querySelectorAll('.broker-environment')) button.on
   if (operatorToken) {
     try { await loadBrokerHistory(); }
     catch (error) { $('broker-message').textContent = `Could not load account history: ${error.message}`; }
+    if (selectedBrokerEnvironment === 'demo') refreshDemoStrategies();
   }
 };
 $('broker-unlock').onclick = async () => {
   const value = $('operator-token').value.trim();
   if (!value) { $('broker-message').textContent = 'Paste the operator token first.'; return; }
   operatorToken = value; $('operator-token').value = '';
-  try { await loadBrokerHistory(); $('broker-message').textContent = `Private ${selectedBrokerEnvironment.toUpperCase()} account view unlocked for this tab.`; }
+  try {
+    await loadBrokerHistory();
+    if (selectedBrokerEnvironment === 'demo') await refreshDemoStrategies();
+    $('broker-message').textContent = `Private ${selectedBrokerEnvironment.toUpperCase()} account view unlocked for this tab.`;
+  }
   catch (error) { operatorToken = ''; $('broker-sync').disabled = true; $('broker-message').textContent = `Could not unlock account view: ${error.message}`; }
 };
 $('broker-sync').onclick = async () => {
@@ -484,6 +495,103 @@ $('broker-sync').onclick = async () => {
   } catch (error) { $('broker-message').textContent = `Sync failed: ${error.message}`; }
   finally { $('broker-sync').disabled = !operatorToken || !brokerStatuses?.[selectedBrokerEnvironment]?.configured; }
 };
+
+function updateDemoButtons() {
+  const run = demoRuns.find((item) => item.id === selectedDemoRun);
+  const unlocked = Boolean(operatorToken) && selectedBrokerEnvironment === 'demo';
+  $('demo-preview').disabled = !unlocked || demoBusy;
+  $('demo-execute').disabled = !unlocked || demoBusy || !brokerStatuses?.demo?.execution_enabled || run?.status !== 'ready' || !run.expires_at || Date.now() >= Date.parse(run.expires_at);
+  $('demo-reconcile').disabled = !unlocked || demoBusy || !['submitting', 'accepted', 'unknown', 'partially_filled'].includes(run?.status);
+}
+function renderDemoDecision() {
+  const container = $('demo-decision'); container.replaceChildren();
+  const run = demoRuns.find((item) => item.id === selectedDemoRun);
+  updateDemoButtons();
+  if (!run) return;
+  const card = node('div', undefined, `demo-plan ${run.status === 'hold' ? 'hold' : ''}`);
+  const heading = node('div', undefined, 'demo-plan-heading');
+  heading.append(node('h4', `Decision ${short(run.id)}`), node('span', run.status.replaceAll('_', ' ').toUpperCase(), `status-pill ${run.status}`));
+  card.append(heading, node('p', run.reason));
+  const facts = node('dl');
+  const addFact = (label, value) => { const wrap = node('div'); wrap.append(node('dt', label), node('dd', value)); facts.append(wrap); };
+  addFact('Strategy version', run.strategy_version);
+  addFact('Created', time(run.created_at));
+  if (run.plan) {
+    addFact('Order plan', `${run.plan.symbol} · ${money(run.plan.amount_usd)} · ${run.plan.settlement_type} · ${run.plan.leverage}×`);
+    addFact('Price limit', `${run.plan.limit_rate} USD · ${run.plan.order_type}`);
+    addFact('Observed quote', `bid ${run.plan.bid} / ask ${run.plan.ask} · ${run.plan.spread_bps} bps`);
+    addFact('Quote time', `${time(run.plan.quote_at)}${run.plan.quote_time_assumed_utc ? ' · source UTC assumed' : ''}`);
+    addFact('Estimated upfront cost', money(run.plan.estimated_upfront_cost_usd));
+    addFact('Account binding', run.plan.account_fingerprint?.slice(0, 16) || '—');
+    addFact('Account source', run.plan.source_sha256?.['/api/v1/trading/info/demo/aggregate-portfolio']?.slice(0, 16) || '—');
+  }
+  if (run.broker_order_id) addFact('Broker order ID', run.broker_order_id);
+  if (run.broker_status_id) addFact('Broker status ID', run.broker_status_id);
+  if (run.broker_position_ids?.length) addFact('Broker position IDs', run.broker_position_ids.join(', '));
+  if (run.expires_at && run.status === 'ready') addFact('Submit by', time(run.expires_at));
+  card.append(facts);
+  const checks = node('ul', undefined, 'demo-checks');
+  for (const check of run.checks || []) {
+    const line = node('li', undefined, check.passed ? '' : 'blocked');
+    line.append(node('b', check.passed ? 'PASS' : 'HOLD'), node('span', `${check.name.replaceAll('_', ' ')} · ${check.detail}`)); checks.append(line);
+  }
+  card.append(checks);
+  if (run.events?.length) {
+    const timeline = node('ul', undefined, 'demo-events');
+    for (const event of run.events) timeline.append(node('li', `${time(event.at)} · ${event.summary}${event.http_status ? ` · HTTP ${event.http_status}` : ''}`));
+    card.append(timeline);
+  }
+  container.append(card);
+}
+function renderDemoRuns() {
+  const container = $('demo-runs'); container.replaceChildren();
+  if (!demoRuns.length) { container.append(node('p', 'No Demo decision has been recorded yet.', 'empty')); return; }
+  const scroll = node('div', undefined, 'table-scroll'); const table = node('table'); const head = node('thead');
+  const headings = node('tr'); for (const label of ['Created', 'Strategy', 'Decision', 'Broker order', 'Open']) headings.append(node('th', label));
+  head.append(headings); table.append(head); const body = node('tbody');
+  for (const run of demoRuns) {
+    const row = node('tr');
+    for (const value of [time(run.created_at), run.strategy_version, run.status.replaceAll('_', ' '), run.broker_order_id || '—']) row.append(node('td', value));
+    const cell = node('td'); const button = node('button', `View ${short(run.id)}`, 'secondary');
+    button.type = 'button'; button.onclick = () => { selectedDemoRun = run.id; renderDemoDecision(); }; cell.append(button); row.append(cell); body.append(row);
+  }
+  table.append(body); scroll.append(table); container.append(scroll);
+}
+async function refreshDemoStrategies() {
+  if (!operatorToken || selectedBrokerEnvironment !== 'demo') return;
+  const result = await request('/api/v1/etoro/demo/strategies', { headers: { 'X-MFD-Operator-Token': operatorToken } });
+  demoRuns = result.runs;
+  if (!selectedDemoRun && demoRuns.length) selectedDemoRun = demoRuns[0].id;
+  renderDemoRuns(); renderDemoDecision();
+  $('demo-strategy-message').textContent = demoRuns.length
+    ? `${demoRuns.length} recorded Demo decision${demoRuns.length === 1 ? '' : 's'}. Submission is separate from broker confirmation.`
+    : 'No Demo decision yet. Preview the rule to record PASS or HOLD checks.';
+}
+async function demoAction(path, options = {}) {
+  demoBusy = true; updateDemoButtons();
+  try {
+    const run = await request(path, { method: 'POST', headers: { 'X-MFD-Operator-Token': operatorToken, ...options.headers } });
+    selectedDemoRun = run.id;
+    await refreshDemoStrategies();
+    $('demo-strategy-message').textContent = `${run.status.replaceAll('_', ' ')} · ${run.reason}`;
+    if (['filled', 'partially_filled'].includes(run.status)) await loadBrokerHistory();
+  } catch (error) {
+    $('demo-strategy-message').textContent = `Action not confirmed: ${error.message}. Refresh the decision history before trying again.`;
+  } finally { demoBusy = false; updateDemoButtons(); }
+}
+$('demo-preview').onclick = async () => {
+  demoPreviewKey ??= randomKey();
+  demoBusy = true; updateDemoButtons();
+  try {
+    const run = await request('/api/v1/etoro/demo/strategies/preview', { method: 'POST', headers: { 'X-MFD-Operator-Token': operatorToken, 'Idempotency-Key': demoPreviewKey } });
+    demoPreviewKey = null; selectedDemoRun = run.id;
+    await refreshDemoStrategies(); $('demo-strategy-message').textContent = `${run.status.toUpperCase()} · ${run.reason}`;
+  } catch (error) { $('demo-strategy-message').textContent = `Preview not confirmed: ${error.message}. The same request key will be reused.`; }
+  finally { demoBusy = false; updateDemoButtons(); }
+};
+$('demo-execute').onclick = () => { if (selectedDemoRun) demoAction(`/api/v1/etoro/demo/strategies/${selectedDemoRun}/execute`); };
+$('demo-reconcile').onclick = () => { if (selectedDemoRun) demoAction(`/api/v1/etoro/demo/strategies/${selectedDemoRun}/reconcile`); };
+
 async function health() {
   try {
     const response = await fetch('/readyz'); const data = await response.json();
@@ -496,3 +604,4 @@ const initialRun = new URL(location.href).searchParams.get('run');
 if (/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(initialRun || '')) selected = initialRun;
 refreshRuns(); refreshOperations(); refreshBrokerStatus(); health();
 setInterval(refreshRuns, 3000); setInterval(refreshOperations, 10000); setInterval(refreshBrokerStatus, 30000); setInterval(health, 10000);
+setInterval(() => { if (operatorToken && selectedBrokerEnvironment === 'demo') refreshDemoStrategies().catch(() => {}); }, 30000);
